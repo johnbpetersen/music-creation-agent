@@ -1,5 +1,10 @@
 // api/index.ts
+import { handle } from "hono/vercel";
 import { app } from "../src/agent";
 
-// Vercel expects a default export (Hono app/handler). No Bun.serve here.
-export default app;
+// Use Node runtime (safer if libs need Node APIs)
+export const config = {
+  runtime: "nodejs20.x",
+};
+
+export default handle(app);

@@ -1,8 +1,5 @@
 {
-    "bunVersion": "1.x",
-    "functions": {
-      "api/index.ts": {
-        "runtime": "bun@1.x"
-      }
-    }
+    "rewrites": [
+      { "source": "/(.*)", "destination": "/api/index" }
+    ]
   }
