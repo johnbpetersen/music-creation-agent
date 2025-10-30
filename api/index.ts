@@ -7,6 +7,6 @@ const app = new Hono();
 // Delegate everything to the agent-kit app.
 app.route("/", agentApp);
 
-export const config = { runtime: "nodejs20.x" };
+export const config = { runtime: "nodejs" };
 
 export default app;
