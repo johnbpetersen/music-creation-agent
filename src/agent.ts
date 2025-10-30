@@ -1,10 +1,8 @@
 import { z } from "zod";
-import {
-  createAgentApp,
-  createAxLLMClient,
-  AgentKitConfig,
-} from "@lucid-dreams/agent-kit";
+import { createAgentApp, AgentKitConfig } from "@lucid-dreams/agent-kit";
 import { flow } from "@ax-llm/ax";
+import { getAxClient } from "./ai/client";
+import { musicEntrypoint } from "./entrypoints/music";
 
 /**
  * This example shows how to combine `createAxLLMClient` with a small AxFlow
@@ -29,23 +27,7 @@ const configOverrides: AgentKitConfig = {
   },
 };
 
-const axClient = createAxLLMClient({
-  logger: {
-    warn(message, error) {
-      if (error) {
-        console.warn(`[examples] ${message}`, error);
-      } else {
-        console.warn(`[examples] ${message}`);
-      }
-    },
-  },
-});
-
-if (!axClient.isConfigured()) {
-  console.warn(
-    "[examples] Ax LLM provider not configured — the flow will fall back to scripted output."
-  );
-}
+const axClient = getAxClient();
 
 const brainstormingFlow = flow<{ topic: string }>()
   .node(
@@ -98,43 +80,45 @@ addEntrypoint({
   }),
   async handler(ctx) {
     try {
-    const topic = String(ctx.input.topic ?? "").trim();
-    if (!topic) {
-      throw new Error("Topic cannot be empty.");
-    }
+      const topic = String(ctx.input.topic ?? "").trim();
+      if (!topic) {
+        throw new Error("Topic cannot be empty.");
+      }
 
-    const llm = axClient.ax;
-    if (!llm) {
-      const fallbackSummary = `AxFlow is not configured. Pretend summary for "${topic}".`;
+      const llm = axClient.ax;
+      if (!llm) {
+        const fallbackSummary = `AxFlow is not configured. Pretend summary for "${topic}".`;
+        return {
+          output: {
+            summary: fallbackSummary,
+            ideas: [
+              "Set OPENAI_API_KEY to enable the Ax integration.",
+              "Keep DEFAULT_PRICE small while testing.",
+              "Ensure PRIVATE_KEY/PAY_TO are correct.",
+            ],
+          },
+          model: "axllm-fallback",
+        };
+      }
+
+      const result = await brainstormingFlow.forward(llm, { topic });
+      const usageEntry = brainstormingFlow.getUsage().at(-1);
+      brainstormingFlow.resetUsage();
+
       return {
         output: {
-          summary: fallbackSummary,
-          ideas: [
-            "Set OPENAI_API_KEY to enable the Ax integration.",
-            "Provide a PRIVATE_KEY so x402 can sign requests.",
-            "Re-run the request once credentials are configured.",
-          ],
+          summary: result.summary ?? "",
+          ideas: Array.isArray(result.ideas) ? result.ideas : [],
         },
-        model: "axllm-fallback",
+        model: usageEntry?.model,
       };
-    }
-
-    const result = await brainstormingFlow.forward(llm, { topic });
-    const usageEntry = brainstormingFlow.getUsage().at(-1);
-    brainstormingFlow.resetUsage();
-
-    return {
-      output: {
-        summary: result.summary ?? "",
-        ideas: Array.isArray(result.ideas) ? result.ideas : [],
-      },
-      model: usageEntry?.model,
-    };
     } catch (error) {
       console.error("[agent] brainstorm handler failed:", error);
       throw error;
     }
   },
 });
+
+addEntrypoint(musicEntrypoint);
 
 export { app };

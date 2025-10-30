@@ -22,6 +22,26 @@ The dev command runs `bun` in watch mode, starts the HTTP server, and reloads wh
 - `bun run start` – start the agent once.
 - `bun run agent` – run the agent module directly (helpful for quick experiments).
 - `bunx tsc --noEmit` – type-check the project.
+- `bun test` – run unit tests (including the music entrypoint handler).
+
+### Music entrypoint
+
+The project now exposes a paid `music` entrypoint that refines a prompt with Daydreams’ Ax LLM client and generates a track via ElevenLabs. Call it with:
+
+```sh
+curl -X POST http://localhost:8787/entrypoints/music/invoke \
+  -H "content-type: application/json" \
+  -d '{"input":{"prompt":"upbeat synthwave", "seconds":45}}'
+```
+
+When payments are required, wrap the request with `scripts/pay.ts` or `scripts/pay-debug.ts`.
+
+### Environment toggles
+
+- `ELEVENLABS_API_KEY` *(optional)* – enable real ElevenLabs Music generation.
+- `USE_REAL_ELEVENLABS=true` – switch from placeholder URLs to live ElevenLabs calls.
+- `USE_REAL_LLM=true` – send refinement prompts through the configured Ax LLM; otherwise a deterministic fallback string is used.
+- Existing payment variables (`FACILITATOR_URL`, `NETWORK`, `PAY_TO`, etc.) continue to drive x402 payments via the Daydreams facilitator.
 
 ### Next steps
 
