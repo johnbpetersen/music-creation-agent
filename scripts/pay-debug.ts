@@ -68,10 +68,30 @@ async function main() {
     x402Version,
     requirement
   );
-  console.log("Payment header:", paymentHeader);
-
+  console.log("Payment header:", paymentHeader)
+  
   const decodedPayment = exact.evm.decodePayment(paymentHeader);
   console.log("Decoded payment:", decodedPayment);
+
+  const verifyPayload = {
+    x402Version,
+    paymentPayload: decodedPayment,
+    paymentRequirements: requirement,
+  };
+
+  console.log("Verifying with facilitator:", facilitatorUrl);
+  const verifyResponse = await fetch(`${facilitatorUrl}/verify`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify(verifyPayload),
+  });
+  console.log("Facilitator verify status:", verifyResponse.status);
+  const verifyText = await verifyResponse.text();
+  console.log("Facilitator verify body:", verifyText);
+  if (!verifyResponse.ok) {
+    console.error("Facilitator verification failed; aborting before settlement.");
+    return;
+  }
 
   const paidResponse = await fetch(url, {
     method: "POST",
