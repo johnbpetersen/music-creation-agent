@@ -14,6 +14,7 @@
   },
   "dependencies": {
     "@lucid-dreams/agent-kit": "latest",
+    "hono": "^4.6.11",
     "dotenv": "^17.2.3",
     "zod": "^4.1.12"
   },
