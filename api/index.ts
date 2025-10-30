@@ -1,12 +1,10 @@
 // api/index.ts
 import { Hono } from "hono";
+import { handle } from "hono/vercel";
 import { app as agentApp } from "../src/agent";
 
-const app = new Hono();
-
-// Delegate everything to the agent-kit app.
-app.route("/", agentApp);
+const app = new Hono().route("/", agentApp as any);
 
 export const config = { runtime: "nodejs" };
 
-export default app;
+export default handle(app);
