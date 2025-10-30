@@ -97,6 +97,7 @@ addEntrypoint({
     ideas: z.array(z.string()),
   }),
   async handler(ctx) {
+    try {
     const topic = String(ctx.input.topic ?? "").trim();
     if (!topic) {
       throw new Error("Topic cannot be empty.");
@@ -129,6 +130,10 @@ addEntrypoint({
       },
       model: usageEntry?.model,
     };
+    } catch (error) {
+      console.error("[agent] brainstorm handler failed:", error);
+      throw error;
+    }
   },
 });
 
