@@ -7,12 +7,13 @@ import {
   createPaymentHeader,
   selectPaymentRequirements,
 } from "x402/client";
-import { PaymentRequirementsSchema, exact } from "x402/types";
+import { PaymentRequirementsSchema } from "x402/types";
+import { exact } from "x402/schemes";
 import { decodeXPaymentResponse } from "x402-fetch";
 
 config({ path: ".env.buyer" });
 
-const payerKey = process.env.PAYER_PRIVATE_KEY as Hex | undefined;
+const payerKey = process.env.PAYER_PRIVATE_KEY as Hex;
 const baseURL = process.env.RESOURCE_SERVER_URL ?? "";
 const endpointPath = process.env.ENDPOINT_PATH ?? "";
 const network = (process.env.NETWORK ?? "base-sepolia") as any;
@@ -60,13 +61,12 @@ async function main() {
   console.log("Selected requirement:", requirement);
 
   const signer = await createSigner(network, payerKey);
-  console.log("Signer chain:", signer.chain);
+  console.log("Signer chain:", (signer as any)?.chain ?? "unknown");
 
   const paymentHeader = await createPaymentHeader(
     signer,
     x402Version,
-    requirement,
-    { facilitatorUrl }
+    requirement
   );
   console.log("Payment header:", paymentHeader);
 
