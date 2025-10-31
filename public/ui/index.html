@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Music Creator</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <style>
+      body {
+        font-family: sans-serif;
+        margin: 2rem;
+        max-width: 480px;
+      }
+      form {
+        display: grid;
+        gap: 1rem;
+      }
+      label {
+        display: grid;
+        gap: 0.25rem;
+      }
+      input,
+      button {
+        font: inherit;
+        padding: 0.5rem;
+      }
+      button {
+        cursor: pointer;
+      }
+      #status {
+        min-height: 1.5rem;
+        margin: 1rem 0;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>Music Creator</h1>
+    <form id="music-form">
+      <label>
+        Prompt
+        <input id="prompt" name="prompt" required />
+      </label>
+      <label>
+        Seconds
+        <input id="seconds" name="seconds" type="number" min="5" max="120" value="45" required />
+      </label>
+      <button id="pay-button" type="submit" disabled>Pay &amp; Create</button>
+    </form>
+    <p id="status"></p>
+    <audio id="player" controls></audio>
+
+    <script src="https://unpkg.com/x402-web@latest/dist/browser.js" defer></script>
+    <script type="module" src="/ui/app.js"></script>
+  </body>
+</html>

@@ -21,6 +21,7 @@ The dev command runs `bun` in watch mode, starts the HTTP server, and reloads wh
 - `bun run dev` – start the agent in watch mode.
 - `bun run start` – start the agent once.
 - `bun run agent` – run the agent module directly (helpful for quick experiments).
+- `bun run ui:build` – bundle the browser UI (re-run after editing `src/ui/app.ts`).
 - `bunx tsc --noEmit` – type-check the project.
 - `bun test` – run unit tests (including music paywall and CLI dry-run coverage).
 
@@ -47,6 +48,12 @@ bun run scripts/music-pay.ts --prompt "upbeat synthwave" --seconds 45
 ```
 
 When payments are required for other entrypoints, wrap the request with `scripts/pay.ts` or `scripts/pay-debug.ts`.
+
+### Minimal browser UI
+
+1. Bundle the client: `bun run ui:build`
+2. Start the server: `bun run dev`
+3. Visit [http://localhost:8787/ui](http://localhost:8787/ui), enter a prompt + duration, click **Pay & Create**, then press play on the audio element once `x402-web` completes the payment.
 
 ### Environment toggles
 
