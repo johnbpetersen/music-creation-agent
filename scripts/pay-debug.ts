@@ -75,11 +75,17 @@ async function main() {
 
   const verifyPayload = {
     x402Version,
+    paymentHeader,
     paymentPayload: decodedPayment,
     paymentRequirements: requirement,
   };
 
   console.log("Verifying with facilitator:", facilitatorUrl);
+  console.log(
+    "Verify payload:",
+    JSON.stringify(verifyPayload, null, 2)
+  );
+
   const verifyResponse = await fetch(`${facilitatorUrl}/verify`, {
     method: "POST",
     headers: { "content-type": "application/json" },
