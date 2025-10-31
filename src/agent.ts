@@ -3,6 +3,10 @@ import { createAgentApp, AgentKitConfig } from "@lucid-dreams/agent-kit";
 import { flow } from "@ax-llm/ax";
 import { getAxClient } from "./ai/client";
 import { musicEntrypoint } from "./entrypoints/music";
+import {
+  createMusicPricingMiddleware,
+  MUSIC_PATH,
+} from "./payments/musicPricing";
 
 /**
  * This example shows how to combine `createAxLLMClient` with a small AxFlow
@@ -22,8 +26,8 @@ const configOverrides: AgentKitConfig = {
     payTo:
       (process.env.PAY_TO as `0x${string}`) ??
       "0xb308ed39d67D0d4BAe5BC2FAEF60c66BBb6AE429",
-    network: (process.env.NETWORK as any) ?? "base",
-    defaultPrice: process.env.DEFAULT_PRICE ?? "0.1",
+    network: (process.env.NETWORK as any) ?? "base-sepolia",
+    defaultPrice: process.env.DEFAULT_PRICE,
   },
 };
 
@@ -51,7 +55,7 @@ const brainstormingFlow = flow<{ topic: string }>()
       : [],
   }));
 
-const { app, addEntrypoint } = createAgentApp(
+const agentApp = createAgentApp(
   {
     name: "ax-flow-agent",
     version: "0.0.1",
@@ -62,6 +66,28 @@ const { app, addEntrypoint } = createAgentApp(
     config: configOverrides,
   }
 );
+
+const { app, addEntrypoint, config } = agentApp;
+
+const paymentsConfig = config.payments;
+const musicPayTo =
+  typeof paymentsConfig.payTo === "string" ? paymentsConfig.payTo : undefined;
+
+if (musicPayTo?.startsWith("0x")) {
+  app.use(
+    MUSIC_PATH,
+    createMusicPricingMiddleware({
+      payTo: musicPayTo,
+      facilitatorUrl: paymentsConfig.facilitatorUrl,
+      network: paymentsConfig.network as any,
+      description: musicEntrypoint.description,
+    })
+  );
+} else {
+  console.warn(
+    "[agent-kit:music-payments] Unable to initialise music pricing middleware; payTo must be an EVM address."
+  );
+}
 
 addEntrypoint({
   key: "brainstorm",

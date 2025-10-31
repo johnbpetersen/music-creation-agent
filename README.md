@@ -22,7 +22,7 @@ The dev command runs `bun` in watch mode, starts the HTTP server, and reloads wh
 - `bun run start` – start the agent once.
 - `bun run agent` – run the agent module directly (helpful for quick experiments).
 - `bunx tsc --noEmit` – type-check the project.
-- `bun test` – run unit tests (including the music entrypoint handler).
+- `bun test` – run unit tests (including music paywall and CLI dry-run coverage).
 
 ### Music entrypoint
 
@@ -34,7 +34,19 @@ curl -X POST http://localhost:8787/entrypoints/music/invoke \
   -d '{"input":{"prompt":"upbeat synthwave", "seconds":45}}'
 ```
 
-When payments are required, wrap the request with `scripts/pay.ts` or `scripts/pay-debug.ts`.
+The music entrypoint applies a dynamic paywall where the price equals `seconds * 5` cents (Base Sepolia USDC). An unpaid call returns the x402 `accepts` requirements with that per-request rate.
+
+Use the helper script to exercise the flow:
+
+```sh
+# Preview the track URL without hitting the network (CI-safe)
+bun run scripts/music-pay.ts --prompt "upbeat synthwave" --seconds 45 --dry-run
+
+# Real payment flow (requires funding the buyer wallet)
+bun run scripts/music-pay.ts --prompt "upbeat synthwave" --seconds 45
+```
+
+When payments are required for other entrypoints, wrap the request with `scripts/pay.ts` or `scripts/pay-debug.ts`.
 
 ### Environment toggles
 
