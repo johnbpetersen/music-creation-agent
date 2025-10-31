@@ -74,6 +74,8 @@ export function createMusicPricingMiddleware({
   description = musicEntrypoint.description ?? "Music generation entrypoint",
 }: MusicPricingOptions): MiddlewareHandler {
   return async (c, next) => {
+    const resourceUrl = new URL(c.req.url).toString() as Resource;
+
     let seconds = 0;
     try {
       const cloned = c.req.raw.clone();
@@ -104,7 +106,7 @@ export function createMusicPricingMiddleware({
             maxTimeoutSeconds: DEFAULT_TIMEOUT_SECONDS,
             inputSchema: inputStructure,
             outputSchema: outputStructure,
-            resource: c.req.url,
+            resource: resourceUrl,
             discoverable: true,
           },
         },

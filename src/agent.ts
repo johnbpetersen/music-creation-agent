@@ -71,9 +71,12 @@ const { app, addEntrypoint, config } = agentApp;
 
 const paymentsConfig = config.payments;
 const musicPayTo =
-  typeof paymentsConfig.payTo === "string" ? paymentsConfig.payTo : undefined;
+  typeof paymentsConfig.payTo === "string" &&
+  paymentsConfig.payTo.startsWith("0x")
+    ? (paymentsConfig.payTo as `0x${string}`)
+    : undefined;
 
-if (musicPayTo?.startsWith("0x")) {
+if (musicPayTo) {
   app.use(
     MUSIC_PATH,
     createMusicPricingMiddleware({

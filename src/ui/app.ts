@@ -1,32 +1,29 @@
+export {};
+
 type X402WebClient = {
   fetch: typeof fetch;
 };
 
 type CreateX402Web = () => X402WebClient;
 
-declare global {
-  interface Window {
-    __musicUi?: {
-      validate: () => void;
-    };
-    x402Web?: {
-      createX402Web?: CreateX402Web;
-    };
-    __createX402Web?: CreateX402Web;
-  }
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  var __createX402Web: CreateX402Web | undefined;
-}
+type GlobalScope = typeof globalThis & {
+  __createX402Web?: CreateX402Web;
+  x402Web?: {
+    createX402Web?: CreateX402Web;
+  };
+  __musicUi?: {
+    validate: () => void;
+  };
+};
+
+const globalScope = globalThis as GlobalScope;
 
 const getCreateX402Web = (): CreateX402Web => {
-  if (typeof window !== "undefined" && window.__createX402Web) {
-    return window.__createX402Web;
+  if (globalScope.__createX402Web) {
+    return globalScope.__createX402Web;
   }
-  if (typeof globalThis !== "undefined" && globalThis.__createX402Web) {
-    return globalThis.__createX402Web;
-  }
-  if (typeof window !== "undefined" && window.x402Web?.createX402Web) {
-    return window.x402Web.createX402Web as CreateX402Web;
+  if (globalScope.x402Web?.createX402Web) {
+    return globalScope.x402Web.createX402Web;
   }
   throw new Error("x402-web client unavailable");
 };
@@ -42,6 +39,12 @@ if (!form || !promptInput || !secondsInput || !payButton || !statusEl || !audioE
   throw new Error("UI elements missing");
 }
 
+const safeStatusEl = statusEl!;
+const safePayButton = payButton!;
+const safeAudioEl = audioEl!;
+const safePromptInput = promptInput!;
+const safeSecondsInput = secondsInput!;
+
 const x402 = getCreateX402Web()();
 
 function sanitizeSeconds(value: string) {
@@ -51,8 +54,8 @@ function sanitizeSeconds(value: string) {
 }
 
 async function runPayment(prompt: string, seconds: number) {
-  statusEl.textContent = "Paying…";
-  payButton.disabled = true;
+  safeStatusEl.textContent = "Paying…";
+  safePayButton.disabled = true;
   try {
     const response = await x402.fetch("/entrypoints/music/invoke", {
       method: "POST",
@@ -70,46 +73,37 @@ async function runPayment(prompt: string, seconds: number) {
     if (typeof trackUrl !== "string" || !trackUrl) {
       throw new Error("Missing trackUrl in response");
     }
-    audioEl.src = trackUrl;
-    statusEl.textContent = "Ready! Press play.";
+    safeAudioEl.src = trackUrl;
+    safeStatusEl.textContent = "Ready! Press play.";
   } catch (error) {
     console.error("music ui error:", error);
-    statusEl.textContent = error instanceof Error ? error.message : "Payment failed.";
+    safeStatusEl.textContent =
+      error instanceof Error ? error.message : "Payment failed.";
   } finally {
-    payButton.disabled = false;
+    safePayButton.disabled = false;
   }
 }
 
 function validate() {
-  const prompt = promptInput.value.trim();
-  const seconds = sanitizeSeconds(secondsInput.value);
+  const prompt = safePromptInput.value.trim();
+  const seconds = sanitizeSeconds(safeSecondsInput.value);
   const valid =
     prompt.length > 0 && Number.isInteger(seconds) && seconds >= 5 && seconds <= 120;
-  payButton.disabled = !valid;
+  safePayButton.disabled = !valid;
 }
 
-promptInput.addEventListener("input", validate);
-secondsInput.addEventListener("input", validate);
+safePromptInput.addEventListener("input", validate);
+safeSecondsInput.addEventListener("input", validate);
 validate();
 
 form.addEventListener("submit", (event) => {
   event.preventDefault();
-  const prompt = promptInput.value.trim();
-  const seconds = sanitizeSeconds(secondsInput.value);
+  const prompt = safePromptInput.value.trim();
+  const seconds = sanitizeSeconds(safeSecondsInput.value);
   if (prompt.length === 0 || !Number.isInteger(seconds)) {
     return;
   }
   void runPayment(prompt, seconds);
 });
 
-declare global {
-  interface Window {
-    __musicUi?: {
-      validate: () => void;
-    };
-  }
-}
-
-if (typeof window !== "undefined") {
-  window.__musicUi = { validate };
-}
+globalScope.__musicUi = { validate };
