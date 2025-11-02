@@ -57,18 +57,43 @@ export function createMusicEntrypoint(
         throw new Error("Prompt cannot be empty.");
       }
 
-      const { refinedPrompt, model } = await refine(prompt, seconds);
-      const { trackUrl, provider } = await generate({
-        prompt: refinedPrompt,
-        seconds,
-      });
+      const runStart = Date.now();
+      console.info(
+        "[music] run start",
+        `runId=${ctx.runId}`,
+        `seconds=${seconds}`,
+        `prompt=${JSON.stringify(prompt)}`
+      );
 
-      return {
-        output: {
-          trackUrl,
-        },
-        model: model ?? provider,
-      };
+      try {
+        const { refinedPrompt, model } = await refine(prompt, seconds);
+        const { trackUrl, provider } = await generate({
+          prompt: refinedPrompt,
+          seconds,
+        });
+
+        console.info(
+          "[music] run success",
+          `runId=${ctx.runId}`,
+          `durationMs=${Date.now() - runStart}`,
+          `provider=${provider}`
+        );
+
+        return {
+          output: {
+            trackUrl,
+          },
+          model: model ?? provider,
+        };
+      } catch (error) {
+        console.error(
+          "[music] run error",
+          `runId=${ctx.runId}`,
+          `durationMs=${Date.now() - runStart}`,
+          error
+        );
+        throw error;
+      }
     },
   };
 }
