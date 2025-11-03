@@ -1,10 +1,15 @@
 import { config } from "dotenv";
 import {
-  wrapFetchWithPayment,
   createSigner,
   decodeXPaymentResponse,
   type Hex,
 } from "x402-fetch";
+import {
+  createPaymentHeader,
+  selectPaymentRequirements,
+} from "x402/client";
+import { exact } from "x402/schemes";
+import { PaymentRequirementsSchema } from "x402/types";
 
 config({ path: ".env.buyer" });
 
@@ -114,14 +119,6 @@ async function run() {
   const facilitatorUrl =
     process.env.FACILITATOR_URL ?? "https://facilitator.daydreams.systems";
 
-  const signer = await createSigner(network, payerKey);
-  const fetchWithPayment = wrapFetchWithPayment(fetch, signer, {
-    chain: network,
-    facilitatorUrl,
-    maxPaymentAtomic: "10000000",
-    maxTotalAtomic: "10000000",
-  } as any);
-
   const payload = {
     input: {
       prompt,
@@ -129,10 +126,44 @@ async function run() {
     },
   };
 
-  console.log("[music-pay] sending paid request via wrapFetchWithPayment");
-  const response = await fetchWithPayment(`${baseURL}${endpointPath}`, {
+  console.log("[music-pay] fetching payment requirements from", `${baseURL}${endpointPath}`);
+  const initialRes = await fetch(`${baseURL}${endpointPath}`, {
     method: "POST",
     headers: { "content-type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+
+  if (initialRes.status !== 402) {
+    const text = await initialRes.text();
+    throw new Error(
+      `Unexpected initial status (${initialRes.status}): ${text}`
+    );
+  }
+
+  const { accepts, x402Version } = await initialRes.json();
+  const parsedRequirements = accepts.map((entry: unknown) =>
+    PaymentRequirementsSchema.parse(entry)
+  );
+  const requirement = selectPaymentRequirements(
+    parsedRequirements,
+    network,
+    "exact"
+  );
+
+  const signer = await createSigner(network, payerKey);
+  const paymentHeader = await createPaymentHeader(
+    signer,
+    x402Version,
+    requirement
+  );
+
+  console.log("[music-pay] retrying with payment header");
+  const response = await fetch(`${baseURL}${endpointPath}`, {
+    method: "POST",
+    headers: {
+      "content-type": "application/json",
+      "X-PAYMENT": paymentHeader,
+    },
     body: JSON.stringify(payload),
   });
 
