@@ -81,15 +81,30 @@ export function createMusicPricingMiddleware({
       const cloned = c.req.raw.clone();
       const payload = await cloned.json();
       const parsedSeconds = deriveSeconds(payload);
+      console.info(
+        "[music-payments] parsed payload",
+        { parsedSeconds, payload }
+      );
       if (typeof parsedSeconds === "number" && parsedSeconds > 0) {
         seconds = Math.floor(parsedSeconds);
       }
-    } catch {
-      // Ignore body parsing failures; we'll fall back to zero-second pricing.
+    } catch (error) {
+      console.warn(
+        "[music-payments] failed to parse request body for pricing",
+        error
+      );
     }
 
     const priceCents = seconds * 5;
     const priceAtomic = centsToAtomicAmount(priceCents);
+    console.info(
+      "[music-payments] computed price",
+      priceCents,
+      "cents (atomic",
+      priceAtomic,
+      ") for",
+      c.req.url
+    );
 
     const middleware = paymentMiddleware(
       payTo,

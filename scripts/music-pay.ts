@@ -1,15 +1,10 @@
 import { config } from "dotenv";
 import {
+  wrapFetchWithPayment,
   createSigner,
   decodeXPaymentResponse,
   type Hex,
 } from "x402-fetch";
-import {
-  createPaymentHeader,
-  selectPaymentRequirements,
-} from "x402/client";
-import { exact } from "x402/schemes";
-import { PaymentRequirementsSchema } from "x402/types";
 
 config({ path: ".env.buyer" });
 
@@ -119,6 +114,14 @@ async function run() {
   const facilitatorUrl =
     process.env.FACILITATOR_URL ?? "https://facilitator.daydreams.systems";
 
+  const signer = await createSigner(network, payerKey);
+  const fetchWithPayment = wrapFetchWithPayment(fetch, signer, {
+    chain: network,
+    facilitatorUrl,
+    maxPaymentAtomic: "10000000",
+    maxTotalAtomic: "10000000",
+  } as any);
+
   const payload = {
     input: {
       prompt,
@@ -126,57 +129,12 @@ async function run() {
     },
   };
 
-  console.log("[music-pay] fetching payment requirements from", `${baseURL}${endpointPath}`);
-  const initialRes = await fetch(`${baseURL}${endpointPath}`, {
+  console.log("[music-pay] sending paid request via wrapFetchWithPayment");
+  const response = await fetchWithPayment(`${baseURL}${endpointPath}`, {
     method: "POST",
     headers: { "content-type": "application/json" },
     body: JSON.stringify(payload),
   });
-
-  if (initialRes.status !== 402) {
-    const text = await initialRes.text();
-    throw new Error(
-      `Unexpected initial status (${initialRes.status}): ${text}`
-    );
-  }
-
-  const { accepts, x402Version } = await initialRes.json();
-  console.log("[music-pay] received", accepts.length, "payment requirement(s)");
-  const parsedRequirements = accepts.map((entry: unknown) =>
-    PaymentRequirementsSchema.parse(entry)
-  );
-  const requirement = selectPaymentRequirements(
-    parsedRequirements,
-    network,
-    "exact"
-  );
-
-  const signer = await createSigner(network, payerKey);
-  const paymentHeader = await createPaymentHeader(
-    signer,
-    x402Version,
-    requirement
-  );
-
-  const verifyPayload = {
-    x402Version,
-    paymentPayload: exact.evm.decodePayment(paymentHeader),
-    paymentRequirements: requirement,
-  };
-
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 30_000);
-
-  console.log("[music-pay] posting paid request with x-payment header");
-  const response = await fetch(`${baseURL}${endpointPath}`, {
-    method: "POST",
-    headers: {
-      "content-type": "application/json",
-      "X-PAYMENT": paymentHeader,
-    },
-    body: JSON.stringify(payload),
-    signal: controller.signal,
-  }).finally(() => clearTimeout(timeout));
 
   const text = await response.text();
   console.log("[music-pay] response status", response.status);
