@@ -52,23 +52,13 @@ function waitForX402(): Promise<X402WebClient> {
   if (cachedClient) return Promise.resolve(cachedClient);
   if (clientPromise) return clientPromise;
 
-  clientPromise = new Promise<X402WebClient>((resolve, reject) => {
-    const start = Date.now();
-    const timeoutMs = 10_000;
+  clientPromise = new Promise<X402WebClient>((resolve) => {
     const poll = () => {
       const factory =
         globalScope.__createX402Web ?? globalScope.x402Web?.createX402Web;
       if (factory) {
-        try {
-          cachedClient = factory();
-          resolve(cachedClient);
-        } catch (error) {
-          reject(error);
-        }
-        return;
-      }
-      if (Date.now() - start > timeoutMs) {
-        reject(new Error("x402-web client unavailable"));
+        cachedClient = factory();
+        resolve(cachedClient);
         return;
       }
       setTimeout(poll, 50);
@@ -78,6 +68,19 @@ function waitForX402(): Promise<X402WebClient> {
 
   return clientPromise;
 }
+
+let x402Ready = false;
+
+waitForX402()
+  .then(() => {
+    x402Ready = true;
+    validate();
+  })
+  .catch((error) => {
+    console.error("music ui failed to load x402-web:", error);
+    safeStatusEl.textContent =
+      "Wallet script failed to load. Refresh and try again.";
+  });
 
 function sanitizeSeconds(value: string) {
   const parsed = Number(value);
@@ -121,7 +124,11 @@ function validate() {
   const prompt = safePromptInput.value.trim();
   const seconds = sanitizeSeconds(safeSecondsInput.value);
   const valid =
-    prompt.length > 0 && Number.isInteger(seconds) && seconds >= 5 && seconds <= 120;
+    prompt.length > 0 &&
+    Number.isInteger(seconds) &&
+    seconds >= 5 &&
+    seconds <= 120 &&
+    x402Ready;
   safePayButton.disabled = !valid;
 }
 
