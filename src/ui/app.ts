@@ -45,7 +45,18 @@ const safeAudioEl = audioEl!;
 const safePromptInput = promptInput!;
 const safeSecondsInput = secondsInput!;
 
-const x402 = getCreateX402Web()();
+let cachedClient: X402WebClient | undefined;
+
+function getX402Client(): X402WebClient {
+  if (cachedClient) return cachedClient;
+  const factory =
+    globalScope.__createX402Web ?? globalScope.x402Web?.createX402Web;
+  if (!factory) {
+    throw new Error("x402-web client unavailable");
+  }
+  cachedClient = factory();
+  return cachedClient;
+}
 
 function sanitizeSeconds(value: string) {
   const parsed = Number(value);
@@ -57,7 +68,8 @@ async function runPayment(prompt: string, seconds: number) {
   safeStatusEl.textContent = "Paying…";
   safePayButton.disabled = true;
   try {
-    const response = await x402.fetch("/entrypoints/music/invoke", {
+    const client = getX402Client();
+    const response = await client.fetch("/entrypoints/music/invoke", {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({
