@@ -64,6 +64,18 @@ describe("ui app", () => {
         );
       }
 
+      if (url.endsWith("/api/x402/confirm")) {
+        const payload = init?.body ? JSON.parse(init.body as string) : {};
+        expect(typeof payload.paymentHeader).toBe("string");
+        return new Response(
+          JSON.stringify({
+            ok: true,
+            trackUrl: "https://tracks.local/song.mp3",
+          }),
+          { status: 200, headers: { "content-type": "application/json" } }
+        );
+      }
+
       return new Response("Not Found", { status: 404 });
     });
 

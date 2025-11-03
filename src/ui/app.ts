@@ -180,22 +180,29 @@ async function runPayment(prompt: string, seconds: number) {
 
     setStatus("Submitting payment…");
 
-    const paidResponse = await fetch("/entrypoints/music/invoke", {
+    const confirmResponse = await fetch("/api/x402/confirm", {
       method: "POST",
       headers: {
         "content-type": "application/json",
-        "x-payment": paymentHeader,
       },
-      body: JSON.stringify({ input: { prompt, seconds } }),
+      body: JSON.stringify({
+        input: { prompt, seconds },
+        paymentHeader,
+      }),
     });
 
-    if (!paidResponse.ok) {
-      const text = await paidResponse.text();
-      throw new Error(text || `Payment failed (${paidResponse.status})`);
+    if (!confirmResponse.ok) {
+      const text = await confirmResponse.text();
+      throw new Error(text || `Payment failed (${confirmResponse.status})`);
     }
 
-    const paidData = await paidResponse.json();
-    const trackUrl: unknown = paidData?.output?.trackUrl;
+    const confirmData = await confirmResponse.json();
+
+    if (confirmData?.ok === false) {
+      throw new Error(confirmData?.message ?? "Payment verification failed.");
+    }
+
+    const trackUrl: unknown = confirmData?.trackUrl ?? confirmData?.output?.trackUrl;
     if (typeof trackUrl !== "string" || !trackUrl) {
       throw new Error("Payment succeeded but track URL missing.");
     }
