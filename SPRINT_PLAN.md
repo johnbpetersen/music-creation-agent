@@ -90,6 +90,27 @@ Assumptions:
 
 ---
 
+## Sprint 5 – Live LLM & Audio Production
+**Goal:** enable real Daydreams Ax refinements and ElevenLabs music generation end-to-end, with credits and observability in place.
+
+- Provision Daydreams Ax agent credentials (`OPENAI_API_KEY`) and toggle `USE_REAL_LLM=true`; capture refined prompts in logs/analytics for debugging.
+- Configure ElevenLabs API key + model, set `USE_REAL_ELEVENLABS=true`, and add guardrails for credit usage (duration caps, throttling, friendly failure message).
+- Implement health/status checks so the UI surfaces when LLM or ElevenLabs are degraded, including opt-in fallback to placeholder audio.
+- Update `/api/health` (or add new endpoint) to expose Ax/ElevenLabs readiness for the UI and operator dashboards.
+- Add integration tests that stub Ax + ElevenLabs clients, asserting we send refined prompts and parse the provider’s response format.
+- Refresh documentation: setup guide for Ax agent + ElevenLabs, credit monitoring tips, and rollback plan.
+
+**Deliverables**
+- Production-ready env configuration with secrets stored in deployment platform.
+- Verified runbook for enabling/disabling real services (including fallback path).
+- Tests covering success and failure of both external providers.
+
+**Exit Criteria**
+- Manual run on staging pays, refines via Daydreams Ax, and returns an ElevenLabs audio URL.
+- Health checks report “live” status, and documentation is updated for operations/on-call.
+
+---
+
 ### Backlog / Stretch
 - Base mainnet launch readiness (env toggles, higher limits).
 - Additional wallet providers (WalletConnect, Rainbow).

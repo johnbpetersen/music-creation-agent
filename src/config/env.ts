@@ -36,6 +36,12 @@ export const EnvSchema = z.object({
   ELEVENLABS_API_URL: z.string().trim().optional(),
   ELEVENLABS_PLACEHOLDER_URL: z.string().trim().optional(),
   ELEVENLABS_API_KEY: z.string().trim().optional(),
+  ELEVENLABS_MODEL_ID: z.string().trim().optional(),
+  ELEVENLABS_MAX_SECONDS: z
+    .coerce.number()
+    .int()
+    .positive()
+    .optional(),
 
   // x402-specific configuration
   X402_CHAIN: z.enum(["base", "base-sepolia"]).default("base-sepolia"),
@@ -84,6 +90,7 @@ export function parseEnv(input: NodeJS.ProcessEnv) {
       parsed.X402_CHAIN === "base"
         ? parsed.BASE_MAINNET_RPC_URL ?? selectedChain.rpcUrl
         : parsed.BASE_SEPOLIA_RPC_URL ?? selectedChain.rpcUrl,
+    ELEVENLABS_MAX_SECONDS: parsed.ELEVENLABS_MAX_SECONDS ?? 90,
   };
 }
 

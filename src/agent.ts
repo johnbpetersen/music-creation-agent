@@ -10,6 +10,7 @@ import {
 import { env } from "./config/env";
 import { getChainConfig } from "./config/chain";
 import { registerX402ConfirmRoute } from "./routes/x402Confirm";
+import { registerHealthRoute } from "./routes/health";
 
 /**
  * This example shows how to combine `createAxLLMClient` with a small AxFlow
@@ -70,6 +71,7 @@ const agentApp = createAgentApp(
 
 const { app, addEntrypoint, config } = agentApp;
 registerX402ConfirmRoute(app);
+registerHealthRoute(app);
 
 const paymentsConfig = config.payments;
 const musicPayTo =

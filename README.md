@@ -69,10 +69,19 @@ Copy `.env.example` to `.env` and update the values that apply to your setup:
   - `X402_CHAIN` – canonical chain selector for signer and verification helpers (`base` or `base-sepolia`).
   - `X402_CHAIN_ID`, `X402_TOKEN_ADDRESS` – optional overrides for chain metadata; inferred from `X402_CHAIN` when not provided.
   - `BASE_MAINNET_RPC_URL`, `BASE_SEPOLIA_RPC_URL` – RPC endpoints used by verification fallbacks; seeded with public Base URLs.
-- **Secrets / feature flags**
-  - `PRIVATE_KEY` – signer key for settlement scripts.
-  - `USE_REAL_LLM`, `USE_REAL_ELEVENLABS` – enable live Ax LLM or ElevenLabs calls.
-  - `ELEVENLABS_API_KEY`, `ELEVENLABS_API_URL`, `ELEVENLABS_PLACEHOLDER_URL` – configure audio generation outputs.
+- **Daydreams Ax LLM**
+  - `OPENAI_API_KEY` – Daydreams agent key used to refine prompts.
+  - `USE_REAL_LLM=true` – opt-in to live refinements (leave `false` for deterministic fallbacks).
+- **ElevenLabs music**
+  - `USE_REAL_ELEVENLABS=true` – enable live audio generation.
+  - `ELEVENLABS_API_KEY` – API key with music credits.
+  - `ELEVENLABS_MODEL_ID` *(default `eleven_music_v1`)* – target model.
+  - `ELEVENLABS_MAX_SECONDS` *(default `90`)* – upper bound enforced when live generation is on.
+  - Optional overrides: `ELEVENLABS_API_URL`, `ELEVENLABS_PLACEHOLDER_URL`.
+- **Other secrets**
+  - `PRIVATE_KEY` – signer key for settlement scripts (optional unless settling on-chain).
+
+Once everything is set, hit `GET /api/health` to confirm the Daydreams Ax agent and ElevenLabs integration are in the expected mode (`live` vs `fallback`).
 
 ### Next steps
 

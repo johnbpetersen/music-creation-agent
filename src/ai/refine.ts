@@ -51,6 +51,13 @@ export async function refinePrompt(prompt: string, seconds: number) {
       throw new Error("LLM returned empty refinement.");
     }
 
+    console.info("[ai] refined prompt", {
+      seconds,
+      original: trimmed,
+      refined,
+      model: usage?.model ?? "unknown",
+    });
+
     return {
       refinedPrompt: refined,
       model: usage?.model,
