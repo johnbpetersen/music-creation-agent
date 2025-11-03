@@ -53,14 +53,26 @@ When payments are required for other entrypoints, wrap the request with `scripts
 
 1. Bundle the client: `bun run ui:build`
 2. Start the server: `bun run dev`
-3. Visit [http://localhost:8787/ui](http://localhost:8787/ui), enter a prompt + duration, click **Pay & Create**, then press play on the audio element once `x402-web` completes the payment.
+3. Visit [http://localhost:8787/ui](http://localhost:8787/ui), connect your wallet, enter a prompt + duration, then click **Pay & Create**. The UI signs an ERC-3009 authorization with your wallet and replays the request with the payment header.
 
-### Environment toggles
+### Environment configuration
 
-- `ELEVENLABS_API_KEY` *(optional)* – enable real ElevenLabs Music generation.
-- `USE_REAL_ELEVENLABS=true` – switch from placeholder URLs to live ElevenLabs calls.
-- `USE_REAL_LLM=true` – send refinement prompts through the configured Ax LLM; otherwise a deterministic fallback string is used.
-- Existing payment variables (`FACILITATOR_URL`, `NETWORK`, `PAY_TO`, etc.) continue to drive x402 payments via the Daydreams facilitator.
+Copy `.env.example` to `.env` and update the values that apply to your setup:
+
+- **Server basics**
+  - `PORT` *(default 8787)* – HTTP port exposed by the agent.
+  - `API_BASE_URL` – optional origin override (used for absolute callback URLs).
+- **x402 payments**
+  - `PAY_TO` – receiving address for USDC payments. Defaults to the demo wallet if omitted.
+  - `FACILITATOR_URL` – x402 facilitator endpoint. Defaults to the Daydreams public facilitator.
+  - `NETWORK` – legacy agent-kit selector (`base` or `base-sepolia`); defaults to `base-sepolia`.
+  - `X402_CHAIN` – canonical chain selector for signer and verification helpers (`base` or `base-sepolia`).
+  - `X402_CHAIN_ID`, `X402_TOKEN_ADDRESS` – optional overrides for chain metadata; inferred from `X402_CHAIN` when not provided.
+  - `BASE_MAINNET_RPC_URL`, `BASE_SEPOLIA_RPC_URL` – RPC endpoints used by verification fallbacks; seeded with public Base URLs.
+- **Secrets / feature flags**
+  - `PRIVATE_KEY` – signer key for settlement scripts.
+  - `USE_REAL_LLM`, `USE_REAL_ELEVENLABS` – enable live Ax LLM or ElevenLabs calls.
+  - `ELEVENLABS_API_KEY`, `ELEVENLABS_API_URL`, `ELEVENLABS_PLACEHOLDER_URL` – configure audio generation outputs.
 
 ### Next steps
 

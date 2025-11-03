@@ -13,7 +13,7 @@ const MUSIC_PATH = "/entrypoints/music/invoke";
 const DEFAULT_NETWORK: Network = "base-sepolia";
 const DEFAULT_TIMEOUT_SECONDS = 300;
 
-const USDC_BASE_SEPOLIA_ASSET = {
+export const USDC_BASE_SEPOLIA_ASSET = {
   address: "0x036CbD53842c5426634e7929541eC2318f3dCF7e" as const,
   decimals: 6,
   eip712: {
@@ -67,6 +67,14 @@ export type MusicPricingOptions = {
   description?: string;
 };
 
+export function getMusicPrice(seconds: number): {
+  cents: number;
+  atomic: string;
+} {
+  const cents = Math.max(0, Math.floor(seconds) * 5);
+  return { cents, atomic: centsToAtomicAmount(cents) };
+}
+
 export function createMusicPricingMiddleware({
   payTo,
   facilitatorUrl,
@@ -95,8 +103,7 @@ export function createMusicPricingMiddleware({
       );
     }
 
-    const priceCents = seconds * 5;
-    const priceAtomic = centsToAtomicAmount(priceCents);
+    const { cents: priceCents, atomic: priceAtomic } = getMusicPrice(seconds);
     console.info(
       "[music-payments] computed price",
       priceCents,

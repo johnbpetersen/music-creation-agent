@@ -1,41 +1,57 @@
-export {};
-
-type X402WebClient = {
-  fetch: typeof fetch;
-};
-
-type CreateX402Web = () => X402WebClient;
+import type { PaymentRequirements } from "x402/types";
+import { PaymentRequirementsSchema } from "x402/types";
+import {
+  createPaymentHeader as createPaymentHeaderInternal,
+  selectPaymentRequirements as selectPaymentRequirementsInternal,
+} from "x402/client";
+import { fetchUiChainConfig } from "./config";
+import {
+  configureWallet,
+  connectWallet,
+  disconnectWallet,
+  getWalletState,
+  subscribeWallet,
+} from "./wallet";
+import type { UiNetwork } from "./config";
 
 type GlobalScope = typeof globalThis & {
-  __createX402Web?: CreateX402Web;
-  x402Web?: {
-    createX402Web?: CreateX402Web;
-  };
   __musicUi?: {
     validate: () => void;
+  };
+  __walletBridge?: unknown;
+  __x402Helpers?: {
+    createPaymentHeader?: typeof createPaymentHeaderInternal;
+    selectPaymentRequirements?: typeof selectPaymentRequirementsInternal;
   };
 };
 
 const globalScope = globalThis as GlobalScope;
 
-const getCreateX402Web = (): CreateX402Web => {
-  if (globalScope.__createX402Web) {
-    return globalScope.__createX402Web;
-  }
-  if (globalScope.x402Web?.createX402Web) {
-    return globalScope.x402Web.createX402Web;
-  }
-  throw new Error("x402-web client unavailable");
-};
+const createPaymentHeader =
+  globalScope.__x402Helpers?.createPaymentHeader ?? createPaymentHeaderInternal;
+const selectPaymentRequirements =
+  globalScope.__x402Helpers?.selectPaymentRequirements ??
+  selectPaymentRequirementsInternal;
 
 const form = document.getElementById("music-form") as HTMLFormElement | null;
 const promptInput = document.getElementById("prompt") as HTMLInputElement | null;
 const secondsInput = document.getElementById("seconds") as HTMLInputElement | null;
 const payButton = document.getElementById("pay-button") as HTMLButtonElement | null;
+const connectButton = document.getElementById("connect-button") as HTMLButtonElement | null;
 const statusEl = document.getElementById("status") as HTMLParagraphElement | null;
+const walletBadge = document.getElementById("wallet-status") as HTMLSpanElement | null;
 const audioEl = document.getElementById("player") as HTMLAudioElement | null;
 
-if (!form || !promptInput || !secondsInput || !payButton || !statusEl || !audioEl) {
+if (
+  !form ||
+  !promptInput ||
+  !secondsInput ||
+  !payButton ||
+  !statusEl ||
+  !audioEl ||
+  !connectButton ||
+  !walletBadge
+) {
   throw new Error("UI elements missing");
 }
 
@@ -44,43 +60,12 @@ const safePayButton = payButton!;
 const safeAudioEl = audioEl!;
 const safePromptInput = promptInput!;
 const safeSecondsInput = secondsInput!;
+const safeConnectButton = connectButton!;
+const safeWalletBadge = walletBadge!;
 
-let cachedClient: X402WebClient | undefined;
-let clientPromise: Promise<X402WebClient> | undefined;
-
-function waitForX402(): Promise<X402WebClient> {
-  if (cachedClient) return Promise.resolve(cachedClient);
-  if (clientPromise) return clientPromise;
-
-  clientPromise = new Promise<X402WebClient>((resolve) => {
-    const poll = () => {
-      const factory =
-        globalScope.__createX402Web ?? globalScope.x402Web?.createX402Web;
-      if (factory) {
-        cachedClient = factory();
-        resolve(cachedClient);
-        return;
-      }
-      setTimeout(poll, 50);
-    };
-    poll();
-  });
-
-  return clientPromise;
-}
-
-let x402Ready = false;
-
-waitForX402()
-  .then(() => {
-    x402Ready = true;
-    validate();
-  })
-  .catch((error) => {
-    console.error("music ui failed to load x402-web:", error);
-    safeStatusEl.textContent =
-      "Wallet script failed to load. Refresh and try again.";
-  });
+let uiReady = false;
+let currentChainId: number | null = null;
+let currentNetwork: UiNetwork | null = null;
 
 function sanitizeSeconds(value: string) {
   const parsed = Number(value);
@@ -88,53 +73,186 @@ function sanitizeSeconds(value: string) {
   return Math.floor(parsed);
 }
 
-async function runPayment(prompt: string, seconds: number) {
-  safeStatusEl.textContent = "Paying…";
-  safePayButton.disabled = true;
-  try {
-    const client = await waitForX402();
-    const response = await client.fetch("/entrypoints/music/invoke", {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({
-        input: { prompt, seconds },
-      }),
-    });
-    if (!response.ok) {
-      const message = await response.text();
-      throw new Error(`Request failed: ${message}`);
-    }
-    const data = await response.json();
-    const trackUrl: unknown = data?.output?.trackUrl;
-    if (typeof trackUrl !== "string" || !trackUrl) {
-      throw new Error("Missing trackUrl in response");
-    }
-    safeAudioEl.src = trackUrl;
-    safeStatusEl.textContent = "Ready! Press play.";
-  } catch (error) {
-    console.error("music ui error:", error);
-    safeStatusEl.textContent =
-      error instanceof Error ? error.message : "Payment failed.";
-  } finally {
-    safePayButton.disabled = false;
+function setStatus(message: string) {
+  safeStatusEl.textContent = message;
+}
+
+function updateWalletBadge() {
+  const state = getWalletState();
+  if (state.isConnected && state.address) {
+    const short = `${state.address.slice(0, 6)}…${state.address.slice(-4)}`;
+    safeWalletBadge.textContent = `Connected: ${short}`;
+    safeConnectButton.textContent = "Disconnect Wallet";
+  } else {
+    safeWalletBadge.textContent = "Wallet not connected";
+    safeConnectButton.textContent = "Connect Wallet";
   }
+}
+
+function isWalletReady(chainId: number | null) {
+  const state = getWalletState();
+  if (!state.isConnected || !state.client || !chainId) return false;
+  return state.chainId === chainId;
 }
 
 function validate() {
   const prompt = safePromptInput.value.trim();
   const seconds = sanitizeSeconds(safeSecondsInput.value);
-  const valid =
+  const validInput =
     prompt.length > 0 &&
     Number.isInteger(seconds) &&
     seconds >= 5 &&
-    seconds <= 120 &&
-    x402Ready;
-  safePayButton.disabled = !valid;
+    seconds <= 120;
+  const walletConnected = isWalletReady(currentChainId);
+  safePayButton.disabled = !(uiReady && validInput && walletConnected);
+}
+
+async function runPayment(prompt: string, seconds: number) {
+  const wallet = getWalletState();
+  if (!wallet.isConnected || !wallet.client) {
+    setStatus("Connect your wallet before paying.");
+    return;
+  }
+
+  if (wallet.chainId !== currentChainId) {
+    setStatus("Wallet is on the wrong network. Switch networks and try again.");
+    return;
+  }
+
+  setStatus("Requesting payment requirements…");
+  safePayButton.disabled = true;
+
+  try {
+    const initialResponse = await fetch("/entrypoints/music/invoke", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ input: { prompt, seconds } }),
+    });
+
+    if (initialResponse.status !== 402) {
+      if (!initialResponse.ok) {
+        const text = await initialResponse.text();
+        throw new Error(text || `Unexpected status ${initialResponse.status}`);
+      }
+
+      const data = await initialResponse.json();
+      const trackUrl: unknown = data?.output?.trackUrl;
+      if (typeof trackUrl !== "string" || !trackUrl) {
+        throw new Error("Missing trackUrl in response");
+      }
+      safeAudioEl.src = trackUrl;
+      setStatus("Ready! Press play.");
+      return;
+    }
+
+    const body = await initialResponse.json();
+    const accepts: unknown[] = Array.isArray(body?.accepts) ? body.accepts : [];
+    const x402Version = body?.x402Version;
+
+    if (!accepts.length || typeof x402Version !== "number") {
+      throw new Error("Malformed x402 requirements");
+    }
+
+    const requirements: PaymentRequirements[] = accepts.map((entry) =>
+      PaymentRequirementsSchema.parse(entry)
+    );
+
+    const chainState = currentChainId;
+    if (!chainState) {
+      throw new Error("Chain configuration missing");
+    }
+
+    const network = requirements[0]?.network;
+
+    const selected = selectPaymentRequirements(
+      requirements,
+      currentNetwork ?? network,
+      "exact"
+    );
+
+    setStatus("Signing authorization…");
+
+    const paymentHeader = await createPaymentHeader(
+      wallet.client,
+      x402Version,
+      selected
+    );
+
+    setStatus("Submitting payment…");
+
+    const paidResponse = await fetch("/entrypoints/music/invoke", {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        "x-payment": paymentHeader,
+      },
+      body: JSON.stringify({ input: { prompt, seconds } }),
+    });
+
+    if (!paidResponse.ok) {
+      const text = await paidResponse.text();
+      throw new Error(text || `Payment failed (${paidResponse.status})`);
+    }
+
+    const paidData = await paidResponse.json();
+    const trackUrl: unknown = paidData?.output?.trackUrl;
+    if (typeof trackUrl !== "string" || !trackUrl) {
+      throw new Error("Payment succeeded but track URL missing.");
+    }
+
+    safeAudioEl.src = trackUrl;
+    setStatus("Ready! Press play.");
+  } catch (error) {
+    console.error("music ui error:", error);
+    setStatus(error instanceof Error ? error.message : "Payment failed.");
+  } finally {
+    validate();
+  }
+}
+
+async function init() {
+  try {
+    const config = await fetchUiChainConfig();
+    configureWallet(config);
+    currentChainId = config.chainId;
+    currentNetwork = config.network;
+    uiReady = true;
+    setStatus("Wallet not connected.");
+    validate();
+  } catch (error) {
+    console.error("Failed to initialise UI config:", error);
+    setStatus("Failed to load configuration. Refresh and try again.");
+  }
 }
 
 safePromptInput.addEventListener("input", validate);
 safeSecondsInput.addEventListener("input", validate);
-validate();
+
+subscribeWallet(() => {
+  updateWalletBadge();
+  validate();
+});
+
+safeConnectButton.addEventListener("click", async () => {
+  const isConnected = getWalletState().isConnected;
+  if (isConnected) {
+    disconnectWallet();
+    setStatus("Wallet disconnected.");
+    validate();
+    return;
+  }
+
+  setStatus("Connecting wallet…");
+  try {
+    await connectWallet("coinbase");
+    setStatus("Wallet connected. Ready to pay.");
+  } catch (error: any) {
+    console.error("Wallet connect failed:", error);
+    setStatus(error?.message || "Failed to connect wallet.");
+  } finally {
+    validate();
+  }
+});
 
 form.addEventListener("submit", (event) => {
   event.preventDefault();
@@ -145,5 +263,9 @@ form.addEventListener("submit", (event) => {
   }
   void runPayment(prompt, seconds);
 });
+
+updateWalletBadge();
+validate();
+void init();
 
 globalScope.__musicUi = { validate };

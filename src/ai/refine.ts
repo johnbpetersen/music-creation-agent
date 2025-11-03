@@ -1,7 +1,8 @@
 import { flow } from "@ax-llm/ax";
 import { getAxClient } from "./client";
+import { env } from "../config/env";
 
-const USE_REAL_LLM = process.env.USE_REAL_LLM === "true";
+const USE_REAL_LLM = env.USE_REAL_LLM === "true";
 
 type RefineInput = {
   prompt: string;

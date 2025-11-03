@@ -1,20 +1,22 @@
+import { env } from "../config/env";
+
 type GenerateInput = {
   prompt: string;
   seconds: number;
 };
 
 const ELEVENLABS_API_URL =
-  process.env.ELEVENLABS_API_URL ??
+  env.ELEVENLABS_API_URL ??
   "https://api.elevenlabs.io/v1/music/generate";
 
 const ELEVENLABS_PLACEHOLDER_URL =
-  process.env.ELEVENLABS_PLACEHOLDER_URL ??
+  env.ELEVENLABS_PLACEHOLDER_URL ??
   "https://example.com/placeholder-track.mp3";
 
-const USE_REAL_ELEVENLABS = process.env.USE_REAL_ELEVENLABS === "true";
+const USE_REAL_ELEVENLABS = env.USE_REAL_ELEVENLABS === "true";
 
 function getApiKey() {
-  return process.env.ELEVENLABS_API_KEY?.trim();
+  return env.ELEVENLABS_API_KEY?.trim();
 }
 
 export async function generateMusicTrack({

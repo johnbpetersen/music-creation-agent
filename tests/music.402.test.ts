@@ -1,5 +1,12 @@
-import { describe, expect, it } from "bun:test";
+import { describe, expect, it, mock } from "bun:test";
+import { createSigner } from "x402-fetch";
+import { createPaymentHeader } from "x402/client";
+import type { Hex } from "x402-fetch";
+import type { PaymentRequirements } from "x402/types";
 import { app } from "../src/agent";
+import { env } from "../src/config/env";
+import { getChainConfig } from "../src/config/chain";
+import { getMusicPrice } from "../src/payments/musicPricing";
 
 describe("music endpoint paywall", () => {
   it("returns 402 with x402 requirements when unpaid", async () => {
@@ -26,6 +33,86 @@ describe("music endpoint paywall", () => {
       "0x036CbD53842c5426634e7929541eC2318f3dCF7e"
     );
     expect(requirement.payTo.toLowerCase()).toMatch(/^0x[0-9a-f]{40}$/);
+  });
+
+  it("confirms payment via facilitator and returns track", async () => {
+    const chain = getChainConfig(env);
+    const payTo =
+      (env.PAY_TO as `0x${string}` | undefined) ??
+      "0xb308ed39d67D0d4BAe5BC2FAEF60c66BBb6AE429";
+    const { atomic: requiredAtomic } = getMusicPrice(45);
+
+    const requirements: PaymentRequirements = {
+      scheme: "exact",
+      network: chain.network,
+      maxAmountRequired: requiredAtomic,
+      resource: "https://music-creation-agent.local/entrypoints/music/invoke",
+      description: "Music generation entrypoint",
+      mimeType: "application/json",
+      outputSchema: undefined,
+      payTo,
+      maxTimeoutSeconds: 300,
+      asset: chain.usdcAddress,
+      extra: { name: "USDC", version: "2" },
+    };
+
+    const signer = await createSigner(
+      chain.network,
+      "0x7957791df726a7136ab5203afc5b273c0f971b31d0b1d07e6ea7f64311bf1c55" as Hex
+    );
+
+    const paymentHeader = await createPaymentHeader(signer, 1, requirements);
+
+    const originalFetch = global.fetch;
+    const verifyMock = mock(
+      async (input: RequestInfo | URL, init?: RequestInit) => {
+        const url =
+          typeof input === "string"
+            ? input
+            : input instanceof URL
+            ? input.toString()
+            : input instanceof Request
+            ? input.url
+            : "";
+
+        if (url.endsWith("/verify")) {
+          const body = init?.body ? JSON.parse(init.body as string) : {};
+          expect(body.amountAtomic).toBe(requiredAtomic);
+          return new Response(
+            JSON.stringify({
+              verified: true,
+              amountAtomic: requiredAtomic,
+            }),
+            { status: 200, headers: { "content-type": "application/json" } }
+          );
+        }
+
+        return originalFetch(input as any, init as any);
+      }
+    );
+
+    global.fetch = verifyMock as unknown as typeof fetch;
+
+    try {
+      const res = await app.fetch(
+        new Request("http://localhost/api/x402/confirm", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({
+            input: { prompt: "lofi focus", seconds: 45 },
+            paymentHeader,
+          }),
+        })
+      );
+
+      expect(res.status).toBe(200);
+      const json = await res.json();
+      expect(json.ok).toBe(true);
+      expect(json.trackUrl).toMatch(/^https?:\/\//);
+      expect(verifyMock).toHaveBeenCalledTimes(1);
+    } finally {
+      global.fetch = originalFetch;
+    }
   });
 
   it("prints deterministic track url in dry-run", () => {

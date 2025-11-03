@@ -7,6 +7,9 @@ import {
   createMusicPricingMiddleware,
   MUSIC_PATH,
 } from "./payments/musicPricing";
+import { env } from "./config/env";
+import { getChainConfig } from "./config/chain";
+import { registerX402ConfirmRoute } from "./routes/x402Confirm";
 
 /**
  * This example shows how to combine `createAxLLMClient` with a small AxFlow
@@ -20,14 +23,12 @@ import {
 
 const configOverrides: AgentKitConfig = {
   payments: {
-    facilitatorUrl:
-      (process.env.FACILITATOR_URL as any) ??
-      "https://facilitator.daydreams.systems",
+    facilitatorUrl: env.FACILITATOR_URL,
     payTo:
-      (process.env.PAY_TO as `0x${string}`) ??
+      (env.PAY_TO as `0x${string}` | undefined) ??
       "0xb308ed39d67D0d4BAe5BC2FAEF60c66BBb6AE429",
-    network: (process.env.NETWORK as any) ?? "base-sepolia",
-    defaultPrice: process.env.DEFAULT_PRICE,
+    network: (env.NETWORK ?? getChainConfig(env).network) as any,
+    defaultPrice: env.DEFAULT_PRICE,
   },
 };
 
@@ -68,6 +69,7 @@ const agentApp = createAgentApp(
 );
 
 const { app, addEntrypoint, config } = agentApp;
+registerX402ConfirmRoute(app);
 
 const paymentsConfig = config.payments;
 const musicPayTo =

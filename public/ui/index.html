@@ -43,12 +43,15 @@
         Seconds
         <input id="seconds" name="seconds" type="number" min="5" max="120" value="45" required />
       </label>
+      <div style="display: flex; align-items: center; gap: 0.5rem;">
+        <button id="connect-button" type="button">Connect Wallet</button>
+        <span id="wallet-status">Wallet not connected</span>
+      </div>
       <button id="pay-button" type="submit" disabled>Pay &amp; Create</button>
     </form>
     <p id="status"></p>
     <audio id="player" controls></audio>
 
-    <script src="https://unpkg.com/x402-web@latest/dist/browser.js" defer></script>
     <script type="module" src="/ui/app.js"></script>
   </body>
 </html>

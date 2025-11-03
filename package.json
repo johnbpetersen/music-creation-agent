@@ -15,10 +15,12 @@
     "test": "bun test"
   },
   "dependencies": {
+    "@coinbase/wallet-sdk": "^4.0.0",
     "@lucid-dreams/agent-kit": "latest",
     "hono": "^4.6.11",
     "dotenv": "^17.2.3",
-    "zod": "^4.1.12"
+    "zod": "^4.1.12",
+    "viem": "^2.21.11"
   },
   "devDependencies": {
     "@types/node": "^24.7.2",
