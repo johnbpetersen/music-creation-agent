@@ -46,16 +46,37 @@ const safePromptInput = promptInput!;
 const safeSecondsInput = secondsInput!;
 
 let cachedClient: X402WebClient | undefined;
+let clientPromise: Promise<X402WebClient> | undefined;
 
-function getX402Client(): X402WebClient {
-  if (cachedClient) return cachedClient;
-  const factory =
-    globalScope.__createX402Web ?? globalScope.x402Web?.createX402Web;
-  if (!factory) {
-    throw new Error("x402-web client unavailable");
-  }
-  cachedClient = factory();
-  return cachedClient;
+function waitForX402(): Promise<X402WebClient> {
+  if (cachedClient) return Promise.resolve(cachedClient);
+  if (clientPromise) return clientPromise;
+
+  clientPromise = new Promise<X402WebClient>((resolve, reject) => {
+    const start = Date.now();
+    const timeoutMs = 10_000;
+    const poll = () => {
+      const factory =
+        globalScope.__createX402Web ?? globalScope.x402Web?.createX402Web;
+      if (factory) {
+        try {
+          cachedClient = factory();
+          resolve(cachedClient);
+        } catch (error) {
+          reject(error);
+        }
+        return;
+      }
+      if (Date.now() - start > timeoutMs) {
+        reject(new Error("x402-web client unavailable"));
+        return;
+      }
+      setTimeout(poll, 50);
+    };
+    poll();
+  });
+
+  return clientPromise;
 }
 
 function sanitizeSeconds(value: string) {
@@ -68,7 +89,7 @@ async function runPayment(prompt: string, seconds: number) {
   safeStatusEl.textContent = "Paying…";
   safePayButton.disabled = true;
   try {
-    const client = getX402Client();
+    const client = await waitForX402();
     const response = await client.fetch("/entrypoints/music/invoke", {
       method: "POST",
       headers: { "content-type": "application/json" },
