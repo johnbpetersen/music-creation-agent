@@ -158,10 +158,6 @@ async function run() {
   );
 
   console.log("[music-pay] retrying with payment header");
-
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 35_000);
-
   const response = await fetch(`${baseURL}${endpointPath}`, {
     method: "POST",
     headers: {
@@ -169,8 +165,7 @@ async function run() {
       "X-PAYMENT": paymentHeader,
     },
     body: JSON.stringify(payload),
-    signal: controller.signal,
-  }).finally(() => clearTimeout(timeout));
+  });
 
   const text = await response.text();
   console.log("[music-pay] response status", response.status);
