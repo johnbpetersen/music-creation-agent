@@ -78,6 +78,12 @@ describe("music endpoint paywall", () => {
         if (url.endsWith("/verify")) {
           const body = init?.body ? JSON.parse(init.body as string) : {};
           expect(body.paymentRequirements.maxAmountRequired).toBe(requiredAtomic);
+          expect(body.paymentRequirements.payTo).toBe(
+            payTo.toLowerCase()
+          );
+          expect(body.paymentRequirements.asset).toBe(
+            chain.usdcAddress.toLowerCase()
+          );
           expect(body.paymentPayload.payload.authorization.value).toBe(
             requiredAtomic
           );
@@ -104,7 +110,6 @@ describe("music endpoint paywall", () => {
           body: JSON.stringify({
             input: { prompt: "lofi focus", seconds: 45 },
             paymentHeader,
-            paymentRequirements: requirements,
           }),
         })
       );

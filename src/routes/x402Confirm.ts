@@ -16,7 +16,6 @@ import { verifyAuthorizationWithFacilitator } from "../services/facilitator";
 const ConfirmRequestSchema = z.object({
   input: musicInputSchema,
   paymentHeader: z.string().min(1),
-  paymentRequirements: z.any(),
 });
 
 const chainConfig = getChainConfig(env);
@@ -40,14 +39,6 @@ function respondError(
     },
     status
   );
-}
-
-function toDecimal(value: string) {
-  try {
-    return BigInt(value).toString();
-  } catch {
-    return value;
-  }
 }
 
 export function registerX402ConfirmRoute(app: Hono) {
@@ -76,20 +67,7 @@ export function registerX402ConfirmRoute(app: Hono) {
       );
     }
 
-    const { input, paymentHeader, paymentRequirements: rawRequirements } = parsed.data;
-
-    let paymentRequirements;
-    try {
-      paymentRequirements = PaymentRequirementsSchema.parse(rawRequirements);
-    } catch (error) {
-      return respondError(
-        c,
-        400,
-        "INVALID_PAYMENT_REQUIREMENTS",
-        "paymentRequirements payload is invalid",
-        error instanceof Error ? error.message : String(error)
-      );
-    }
+    const { input, paymentHeader } = parsed.data;
 
     let decoded;
     try {
@@ -168,33 +146,24 @@ export function registerX402ConfirmRoute(app: Hono) {
       );
     }
 
-    if (
-      paymentRequirements.payTo.toLowerCase() !== normalizedExpectedTo ||
-      paymentRequirements.asset.toLowerCase() !== chainConfig.usdcAddress.toLowerCase() ||
-      paymentRequirements.network !== chainConfig.network ||
-      paymentRequirements.scheme !== "exact"
-    ) {
-      return respondError(
-        c,
-        400,
-        "INVALID_REQUIREMENTS",
-        "Payment requirements do not match server configuration."
-      );
-    }
-
-    if (
-      toDecimal(paymentRequirements.maxAmountRequired) !== toDecimal(expectedAtomic)
-    ) {
-      return respondError(
-        c,
-        400,
-        "WRONG_AMOUNT",
-        "Payment requirements amount does not match expected price."
-      );
-    }
-
     const requestUrl = new URL(c.req.url);
     const resourceUrl = `${requestUrl.origin}${MUSIC_PATH}`;
+
+    const paymentRequirements = PaymentRequirementsSchema.parse({
+      scheme: "exact",
+      network: chainConfig.network,
+      maxAmountRequired: expectedAtomic,
+      resource: resourceUrl,
+      description:
+        musicEntrypoint.description ??
+        "Refine a music prompt with Ax LLM and render a track via ElevenLabs.",
+      mimeType: "application/json",
+      outputSchema: MUSIC_OUTPUT_STRUCTURE,
+      payTo: payToAddress,
+      maxTimeoutSeconds: MUSIC_DEFAULT_TIMEOUT_SECONDS,
+      asset: chainConfig.usdcAddress,
+      extra: { name: "USDC", version: "2" },
+    });
 
     const verification = await verifyAuthorizationWithFacilitator({
       facilitatorUrl: env.FACILITATOR_URL,
