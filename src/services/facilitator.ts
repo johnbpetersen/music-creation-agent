@@ -135,7 +135,12 @@ export async function verifyAuthorizationWithFacilitator(
     };
   }
 
-  if (json?.verified !== true) {
+  const verified =
+    json?.verified === true ||
+    json?.isValid === true ||
+    json?.valid === true;
+
+  if (!verified) {
     const message =
       json?.error?.message ?? "Facilitator did not verify authorization";
     return {
