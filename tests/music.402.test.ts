@@ -77,7 +77,10 @@ describe("music endpoint paywall", () => {
 
         if (url.endsWith("/verify")) {
           const body = init?.body ? JSON.parse(init.body as string) : {};
-          expect(body.amountAtomic).toBe(requiredAtomic);
+          expect(body.paymentRequirements.maxAmountRequired).toBe(requiredAtomic);
+          expect(body.paymentPayload.payload.authorization.value).toBe(
+            requiredAtomic
+          );
           return new Response(
             JSON.stringify({
               verified: true,
@@ -101,11 +104,17 @@ describe("music endpoint paywall", () => {
           body: JSON.stringify({
             input: { prompt: "lofi focus", seconds: 45 },
             paymentHeader,
+            paymentRequirements: requirements,
           }),
         })
       );
 
-      expect(res.status).toBe(200);
+      if (res.status !== 200) {
+        const text = await res.text();
+        console.error("confirm failed", res.status, text);
+        throw new Error(`Unexpected status ${res.status}`);
+      }
+
       const json = await res.json();
       expect(json.ok).toBe(true);
       expect(json.trackUrl).toMatch(/^https?:\/\//);

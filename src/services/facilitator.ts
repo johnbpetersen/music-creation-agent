@@ -1,20 +1,14 @@
-export interface FacilitatorAuthorization {
-  from: `0x${string}`;
-  to: `0x${string}`;
-  value: string | number | bigint;
-  validAfter: string | number | bigint;
-  validBefore: string | number | bigint;
-  nonce: `0x${string}`;
-  signature: `0x${string}`;
-}
-
 export interface FacilitatorVerifyParams {
   facilitatorUrl: string;
-  chainId: number;
-  tokenAddress: `0x${string}`;
-  payTo: `0x${string}`;
-  amountAtomic: string;
-  authorization: FacilitatorAuthorization;
+  x402Version: number;
+  paymentRequirements: PaymentRequirements;
+  paymentPayload: PaymentPayload;
+  expected: {
+    chain: string;
+    asset: string;
+    payTo: string;
+    amountAtomic: string;
+  };
 }
 
 export interface FacilitatorVerifySuccess {
@@ -47,25 +41,36 @@ function toDecimalString(value: string | number | bigint) {
 export async function verifyAuthorizationWithFacilitator(
   params: FacilitatorVerifyParams
 ): Promise<FacilitatorVerifyResult> {
-  const { facilitatorUrl, chainId, tokenAddress, payTo, amountAtomic, authorization } =
+  const { facilitatorUrl, x402Version, paymentRequirements, paymentPayload, expected } =
     params;
 
   const url = new URL("/verify", facilitatorUrl).toString();
 
+  const normalizedAuthorization = {
+    from: normalizeHex(paymentPayload.payload.authorization.from),
+    to: normalizeHex(paymentPayload.payload.authorization.to),
+    value: toDecimalString(paymentPayload.payload.authorization.value),
+    validAfter: toDecimalString(paymentPayload.payload.authorization.validAfter),
+    validBefore: toDecimalString(paymentPayload.payload.authorization.validBefore),
+    nonce: normalizeHex(paymentPayload.payload.authorization.nonce),
+  };
+
   const payload = {
-    scheme: "erc3009" as const,
-    chainId,
-    tokenAddress: normalizeHex(tokenAddress),
-    payTo: normalizeHex(payTo),
-    amountAtomic: toDecimalString(amountAtomic),
-    authorization: {
-      from: normalizeHex(authorization.from),
-      to: normalizeHex(authorization.to),
-      value: toDecimalString(authorization.value),
-      validAfter: toDecimalString(authorization.validAfter),
-      validBefore: toDecimalString(authorization.validBefore),
-      nonce: normalizeHex(authorization.nonce),
-      signature: normalizeHex(authorization.signature),
+    x402Version,
+    paymentPayload: {
+      x402Version: paymentPayload.x402Version,
+      scheme: paymentPayload.scheme,
+      network: paymentPayload.network,
+      payload: {
+        signature: normalizeHex(paymentPayload.payload.signature),
+        authorization: normalizedAuthorization,
+      },
+    },
+    paymentRequirements: {
+      ...paymentRequirements,
+      maxAmountRequired: toDecimalString(paymentRequirements.maxAmountRequired),
+      payTo: paymentRequirements.payTo.toLowerCase(),
+      asset: paymentRequirements.asset.toLowerCase(),
     },
   };
 
@@ -91,24 +96,30 @@ export async function verifyAuthorizationWithFacilitator(
   }
 
   const status = res.status;
-  let text: string | undefined;
+  const text = await res.text();
   let json: any = null;
 
-  try {
-    text = await res.text();
-    json = text ? JSON.parse(text) : null;
-  } catch (error) {
-    console.warn("[facilitator] failed to parse JSON", {
-      status,
-      text: text?.slice(0, 200),
-      error: (error as Error).message,
-    });
-    return {
-      ok: false,
-      status,
-      message: "Failed to parse facilitator response",
-      detail: text,
-    };
+  if (
+    res.headers
+      .get("content-type")
+      ?.toLowerCase()
+      .includes("application/json")
+  ) {
+    try {
+      json = text ? JSON.parse(text) : null;
+    } catch (error) {
+      console.warn("[facilitator] failed to parse JSON", {
+        status,
+        text: text.slice(0, 200),
+        error: (error as Error).message,
+      });
+      return {
+        ok: false,
+        status,
+        message: "Failed to parse facilitator response",
+        detail: text,
+      };
+    }
   }
 
   if (!res.ok) {
@@ -138,7 +149,47 @@ export async function verifyAuthorizationWithFacilitator(
   const amountPaid =
     typeof json.amountAtomic === "string"
       ? json.amountAtomic
-      : toDecimalString(json.amount ?? amountAtomic);
+      : toDecimalString(json.amount ?? expected.amountAtomic);
+
+  const responseTo = json.to ?? json.payTo;
+  const responseAsset = json.asset ?? json.symbol;
+  const responseChain = json.chain ?? json.network;
+
+  if (
+    responseTo &&
+    normalizeHex(responseTo) !== normalizeHex(expected.payTo)
+  ) {
+    return {
+      ok: false,
+      status,
+      message: "Payment sent to wrong address",
+      detail: `Expected ${expected.payTo}, got ${responseTo}`,
+    };
+  }
+
+  if (
+    responseAsset &&
+    normalizeHex(responseAsset) !== normalizeHex(expected.asset)
+  ) {
+    return {
+      ok: false,
+      status,
+      message: "Wrong asset used for payment",
+      detail: `Expected ${expected.asset}, got ${responseAsset}`,
+    };
+  }
+
+  if (
+    responseChain &&
+    responseChain.toLowerCase() !== expected.chain.toLowerCase()
+  ) {
+    return {
+      ok: false,
+      status,
+      message: "Payment made on wrong network",
+      detail: `Expected ${expected.chain}, got ${responseChain}`,
+    };
+  }
 
   return {
     ok: true,
@@ -146,3 +197,4 @@ export async function verifyAuthorizationWithFacilitator(
     providerRaw: json,
   };
 }
+import type { PaymentPayload, PaymentRequirements } from "x402/types";

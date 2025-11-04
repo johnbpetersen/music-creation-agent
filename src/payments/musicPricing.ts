@@ -141,3 +141,7 @@ export function createMusicPricingMiddleware({
 }
 
 export { MUSIC_PATH };
+export const MUSIC_INPUT_STRUCTURE = inputStructure;
+export const MUSIC_OUTPUT_STRUCTURE = outputStructure;
+export const MUSIC_DEFAULT_TIMEOUT_SECONDS = DEFAULT_TIMEOUT_SECONDS;
+export const USDC_EIP712_EXTRA = USDC_BASE_SEPOLIA_ASSET.eip712;

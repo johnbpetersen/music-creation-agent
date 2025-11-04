@@ -1,18 +1,22 @@
 import { z } from "zod";
 import type { Context, Hono } from "hono";
 import { exact } from "x402/schemes";
+import { PaymentRequirementsSchema } from "x402/types";
 import { musicEntrypoint, musicInputSchema } from "../entrypoints/music";
 import { env } from "../config/env";
 import { getChainConfig } from "../config/chain";
-import { getMusicPrice } from "../payments/musicPricing";
 import {
-  verifyAuthorizationWithFacilitator,
-  type FacilitatorAuthorization,
-} from "../services/facilitator";
+  getMusicPrice,
+  MUSIC_DEFAULT_TIMEOUT_SECONDS,
+  MUSIC_OUTPUT_STRUCTURE,
+  MUSIC_PATH,
+} from "../payments/musicPricing";
+import { verifyAuthorizationWithFacilitator } from "../services/facilitator";
 
 const ConfirmRequestSchema = z.object({
   input: musicInputSchema,
   paymentHeader: z.string().min(1),
+  paymentRequirements: z.any(),
 });
 
 const chainConfig = getChainConfig(env);
@@ -36,6 +40,14 @@ function respondError(
     },
     status
   );
+}
+
+function toDecimal(value: string) {
+  try {
+    return BigInt(value).toString();
+  } catch {
+    return value;
+  }
 }
 
 export function registerX402ConfirmRoute(app: Hono) {
@@ -64,7 +76,20 @@ export function registerX402ConfirmRoute(app: Hono) {
       );
     }
 
-    const { input, paymentHeader } = parsed.data;
+    const { input, paymentHeader, paymentRequirements: rawRequirements } = parsed.data;
+
+    let paymentRequirements;
+    try {
+      paymentRequirements = PaymentRequirementsSchema.parse(rawRequirements);
+    } catch (error) {
+      return respondError(
+        c,
+        400,
+        "INVALID_PAYMENT_REQUIREMENTS",
+        "paymentRequirements payload is invalid",
+        error instanceof Error ? error.message : String(error)
+      );
+    }
 
     let decoded;
     try {
@@ -107,10 +132,7 @@ export function registerX402ConfirmRoute(app: Hono) {
       );
     }
 
-    const authorization = {
-      ...decoded.payload.authorization,
-      signature,
-    } as FacilitatorAuthorization;
+    const authorization = decoded.payload.authorization;
     const normalizedTo = authorization.to.toLowerCase();
     const normalizedExpectedTo = payToAddress.toLowerCase();
 
@@ -146,22 +168,68 @@ export function registerX402ConfirmRoute(app: Hono) {
       );
     }
 
-    const verifyResult = await verifyAuthorizationWithFacilitator({
+    if (
+      paymentRequirements.payTo.toLowerCase() !== normalizedExpectedTo ||
+      paymentRequirements.asset.toLowerCase() !== chainConfig.usdcAddress.toLowerCase() ||
+      paymentRequirements.network !== chainConfig.network ||
+      paymentRequirements.scheme !== "exact"
+    ) {
+      return respondError(
+        c,
+        400,
+        "INVALID_REQUIREMENTS",
+        "Payment requirements do not match server configuration."
+      );
+    }
+
+    if (
+      toDecimal(paymentRequirements.maxAmountRequired) !== toDecimal(expectedAtomic)
+    ) {
+      return respondError(
+        c,
+        400,
+        "WRONG_AMOUNT",
+        "Payment requirements amount does not match expected price."
+      );
+    }
+
+    const requestUrl = new URL(c.req.url);
+    const resourceUrl = `${requestUrl.origin}${MUSIC_PATH}`;
+
+    const verification = await verifyAuthorizationWithFacilitator({
       facilitatorUrl: env.FACILITATOR_URL,
-      chainId: chainConfig.chainId,
-      tokenAddress: chainConfig.usdcAddress,
-      payTo: payToAddress,
-      amountAtomic: expectedAtomic,
-      authorization,
+      x402Version: decoded.x402Version,
+      paymentRequirements: {
+        ...paymentRequirements,
+        resource: paymentRequirements.resource ?? resourceUrl,
+        maxAmountRequired: expectedAtomic,
+        mimeType: paymentRequirements.mimeType ?? "application/json",
+        description:
+          paymentRequirements.description ??
+          musicEntrypoint.description ??
+          "Music generation entrypoint",
+        outputSchema:
+          paymentRequirements.outputSchema ?? MUSIC_OUTPUT_STRUCTURE,
+        maxTimeoutSeconds:
+          paymentRequirements.maxTimeoutSeconds ?? MUSIC_DEFAULT_TIMEOUT_SECONDS,
+        extra: paymentRequirements.extra ?? { name: "USDC", version: "2" },
+      },
+      paymentPayload: decoded,
+      expected: {
+        chain: chainConfig.network,
+        asset: chainConfig.usdcAddress,
+        payTo: payToAddress,
+        amountAtomic: expectedAtomic,
+      },
     });
 
-    if (!verifyResult.ok) {
+    if (!verification.ok) {
       return respondError(
         c,
         400,
         "VERIFY_FAILED",
-        verifyResult.message,
-        verifyResult.detail
+        verification.message,
+        verification.detail
       );
     }
 

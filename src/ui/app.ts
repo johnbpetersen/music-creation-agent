@@ -188,6 +188,7 @@ async function runPayment(prompt: string, seconds: number) {
       body: JSON.stringify({
         input: { prompt, seconds },
         paymentHeader,
+        paymentRequirements: selected,
       }),
     });
 
