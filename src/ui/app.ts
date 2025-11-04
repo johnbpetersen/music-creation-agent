@@ -88,11 +88,21 @@ function resetTrack() {
   safeDownloadLink.removeAttribute("download");
 }
 
-function setTrack(url: string) {
+function setTrack(url: string, provider?: string | null) {
   safeAudioEl.src = url;
-  safeDownloadLink.href = url;
-  safeDownloadLink.download = `music-track-${Date.now()}.mp3`;
-  safeDownloadLink.style.display = "inline";
+  const isPlaceholder =
+    provider === "elevenlabs-placeholder" ||
+    /placeholder/i.test(url);
+  if (isPlaceholder) {
+    safeDownloadLink.style.display = "none";
+    safeDownloadLink.removeAttribute("href");
+    safeDownloadLink.removeAttribute("download");
+  } else {
+    safeDownloadLink.href = url;
+    safeDownloadLink.download = `music-track-${Date.now()}.mp3`;
+    safeDownloadLink.style.display = "inline";
+  }
+  return isPlaceholder;
 }
 
 function updateWalletBadge() {
@@ -159,8 +169,12 @@ async function runPayment(prompt: string, seconds: number) {
       if (typeof trackUrl !== "string" || !trackUrl) {
         throw new Error("Missing trackUrl in response");
       }
-      setTrack(trackUrl);
-      setStatus("Ready! Press play.");
+      const placeholder = setTrack(trackUrl, data?.provider);
+      setStatus(
+        placeholder
+          ? "Fallback audio loaded (no download)."
+          : "Ready! Press play."
+      );
       return;
     }
 
@@ -223,12 +237,22 @@ async function runPayment(prompt: string, seconds: number) {
     }
 
     const trackUrl: unknown = confirmData?.trackUrl ?? confirmData?.output?.trackUrl;
-   if (typeof trackUrl !== "string" || !trackUrl) {
+    if (typeof trackUrl !== "string" || !trackUrl) {
       throw new Error("Payment succeeded but track URL missing.");
     }
 
-    setTrack(trackUrl);
-    setStatus("Ready! Press play.");
+    const provider =
+      typeof confirmData?.provider === "string"
+        ? confirmData.provider
+        : typeof confirmData?.model === "string"
+          ? confirmData.model
+          : undefined;
+    const placeholder = setTrack(trackUrl, provider);
+    setStatus(
+      placeholder
+        ? "Fallback audio loaded (no download)."
+        : "Ready! Press play."
+    );
   } catch (error) {
     console.error("music ui error:", error);
     resetTrack();
