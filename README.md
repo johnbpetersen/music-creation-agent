@@ -72,6 +72,7 @@ Copy `.env.example` to `.env` and update the values that apply to your setup:
 - **Daydreams Ax LLM**
   - `OPENAI_API_KEY` – Daydreams agent key used to refine prompts.
   - `USE_REAL_LLM=true` – opt-in to live refinements (leave `false` for deterministic fallbacks).
+  - `AX_MODEL` *(optional, default `gpt-4.1-mini`)* – override the Daydreams model if you prefer a cheaper tier.
 - **ElevenLabs music**
   - `USE_REAL_ELEVENLABS=true` – enable live audio generation.
   - `ELEVENLABS_API_KEY` – API key with music credits.
@@ -80,6 +81,10 @@ Copy `.env.example` to `.env` and update the values that apply to your setup:
   - Optional overrides: `ELEVENLABS_API_URL`, `ELEVENLABS_PLACEHOLDER_URL`.
 - **Other secrets**
   - `PRIVATE_KEY` – signer key for settlement scripts (optional unless settling on-chain).
+- **Settlement (optional)**
+  - `SETTLE_TRANSACTIONS=true` – automatically broadcast ERC-3009 settle transactions after verification.
+  - `SETTLE_PRIVATE_KEY` – key used to settle payments (defaults to `PRIVATE_KEY` if omitted).
+  - `SETTLE_RPC_URL` – RPC endpoint for the settlement chain (defaults to the chain RPC).
 
 Once everything is set, hit `GET /api/health` to confirm the Daydreams Ax agent and ElevenLabs integration are in the expected mode (`live` vs `fallback`).
 

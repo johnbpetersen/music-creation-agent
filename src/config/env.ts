@@ -42,6 +42,17 @@ export const EnvSchema = z.object({
     .int()
     .positive()
     .optional(),
+  AX_MODEL: z.string().trim().optional(),
+  AXLLM_MODEL: z.string().trim().optional(),
+  OPENAI_MODEL: z.string().trim().optional(),
+
+  SETTLE_TRANSACTIONS: z.enum(["true", "false"]).optional(),
+  SETTLE_PRIVATE_KEY: z
+    .string()
+    .trim()
+    .regex(privateKeyRegex, "SETTLE_PRIVATE_KEY must be a 64-byte hex string")
+    .optional(),
+  SETTLE_RPC_URL: z.string().trim().optional(),
 
   // x402-specific configuration
   X402_CHAIN: z.enum(["base", "base-sepolia"]).default("base-sepolia"),
@@ -81,16 +92,20 @@ const chainDefaults = {
 export function parseEnv(input: NodeJS.ProcessEnv) {
   const parsed = EnvSchema.parse(input);
   const selectedChain = chainDefaults[parsed.X402_CHAIN];
+  const x402RpcUrl =
+    parsed.X402_CHAIN === "base"
+      ? parsed.BASE_MAINNET_RPC_URL ?? selectedChain.rpcUrl
+      : parsed.BASE_SEPOLIA_RPC_URL ?? selectedChain.rpcUrl;
 
   return {
     ...parsed,
     X402_CHAIN_ID: parsed.X402_CHAIN_ID ?? selectedChain.chainId,
     X402_TOKEN_ADDRESS: parsed.X402_TOKEN_ADDRESS ?? selectedChain.tokenAddress,
-    X402_RPC_URL:
-      parsed.X402_CHAIN === "base"
-        ? parsed.BASE_MAINNET_RPC_URL ?? selectedChain.rpcUrl
-        : parsed.BASE_SEPOLIA_RPC_URL ?? selectedChain.rpcUrl,
+    X402_RPC_URL: x402RpcUrl,
     ELEVENLABS_MAX_SECONDS: parsed.ELEVENLABS_MAX_SECONDS ?? 90,
+    SETTLE_TRANSACTIONS: parsed.SETTLE_TRANSACTIONS ?? "false",
+    SETTLE_PRIVATE_KEY: parsed.SETTLE_PRIVATE_KEY ?? parsed.PRIVATE_KEY,
+    SETTLE_RPC_URL: parsed.SETTLE_RPC_URL ?? x402RpcUrl,
   };
 }
 

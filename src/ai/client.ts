@@ -2,6 +2,7 @@ import { createAxLLMClient } from "@lucid-dreams/agent-kit";
 import { privateKeyToAccount } from "viem/accounts";
 
 const axClient = createAxLLMClient({
+  model: process.env.AX_MODEL || process.env.AXLLM_MODEL || process.env.OPENAI_MODEL || "gpt-4.1-mini",
   logger: {
     warn(message, error) {
       if (error) console.warn(`[ai] ${message}`, error);

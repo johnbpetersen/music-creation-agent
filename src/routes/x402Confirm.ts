@@ -12,6 +12,7 @@ import {
   MUSIC_PATH,
 } from "../payments/musicPricing";
 import { verifyAuthorizationWithFacilitator } from "../services/facilitator";
+import { settleAuthorization } from "../services/settlement";
 
 const ConfirmRequestSchema = z.object({
   input: musicInputSchema,
@@ -202,6 +203,35 @@ export function registerX402ConfirmRoute(app: Hono) {
       );
     }
 
+    let settlementTxHash: string | undefined;
+
+    if (env.SETTLE_TRANSACTIONS === "true") {
+      const settleKey = env.SETTLE_PRIVATE_KEY;
+      if (!settleKey) {
+        console.warn(
+          "[x402-confirm] Settlement requested but SETTLE_PRIVATE_KEY missing"
+        );
+      } else {
+        try {
+          settlementTxHash = await settleAuthorization({
+            authorization: {
+              ...authorization,
+              signature,
+            },
+            usdcContract: chainConfig.usdcAddress as `0x${string}`,
+            chainId: chainConfig.chainId,
+            rpcUrl: env.SETTLE_RPC_URL ?? chainConfig.rpcUrl,
+            privateKey: settleKey as `0x${string}`,
+          });
+          console.info("[x402-confirm] Settlement broadcast", {
+            txHash: settlementTxHash,
+          });
+        } catch (error) {
+          console.error("[x402-confirm] Settlement failed", error);
+        }
+      }
+    }
+
     const controller = new AbortController();
     const runId = crypto.randomUUID();
 
@@ -225,6 +255,7 @@ export function registerX402ConfirmRoute(app: Hono) {
         },
         requestId: runId,
         provider: handlerResult.model,
+        settlementTxHash,
       });
     } catch (error) {
       return respondError(
