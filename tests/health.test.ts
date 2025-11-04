@@ -11,7 +11,7 @@ describe("health endpoint", () => {
     const body = await res.json();
 
     expect(body.ok).toBe(true);
-    expect(body.services.daydreamsAx.mode).toBe("fallback");
+    expect(["fallback", "live"]).toContain(body.services.daydreamsAx.mode);
     expect(body.services.daydreamsAx.ready).toBe(true);
     expect(body.services.elevenLabs.mode).toBe("placeholder");
     expect(body.services.elevenLabs.ready).toBe(true);

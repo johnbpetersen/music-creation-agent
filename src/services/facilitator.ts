@@ -98,10 +98,16 @@ export async function verifyAuthorizationWithFacilitator(
     text = await res.text();
     json = text ? JSON.parse(text) : null;
   } catch (error) {
+    console.warn("[facilitator] failed to parse JSON", {
+      status,
+      text: text?.slice(0, 200),
+      error: (error as Error).message,
+    });
     return {
       ok: false,
       status,
       message: "Failed to parse facilitator response",
+      detail: text,
     };
   }
 
