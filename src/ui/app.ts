@@ -41,6 +41,7 @@ const connectButton = document.getElementById("connect-button") as HTMLButtonEle
 const statusEl = document.getElementById("status") as HTMLParagraphElement | null;
 const walletBadge = document.getElementById("wallet-status") as HTMLSpanElement | null;
 const audioEl = document.getElementById("player") as HTMLAudioElement | null;
+const downloadLink = document.getElementById("download-link") as HTMLAnchorElement | null;
 
 if (
   !form ||
@@ -50,7 +51,8 @@ if (
   !statusEl ||
   !audioEl ||
   !connectButton ||
-  !walletBadge
+  !walletBadge ||
+  !downloadLink
 ) {
   throw new Error("UI elements missing");
 }
@@ -62,6 +64,7 @@ const safePromptInput = promptInput!;
 const safeSecondsInput = secondsInput!;
 const safeConnectButton = connectButton!;
 const safeWalletBadge = walletBadge!;
+const safeDownloadLink = downloadLink!;
 
 let uiReady = false;
 let currentChainId: number | null = null;
@@ -75,6 +78,21 @@ function sanitizeSeconds(value: string) {
 
 function setStatus(message: string) {
   safeStatusEl.textContent = message;
+}
+
+function resetTrack() {
+  safeAudioEl.removeAttribute("src");
+  safeAudioEl.load();
+  safeDownloadLink.style.display = "none";
+  safeDownloadLink.removeAttribute("href");
+  safeDownloadLink.removeAttribute("download");
+}
+
+function setTrack(url: string) {
+  safeAudioEl.src = url;
+  safeDownloadLink.href = url;
+  safeDownloadLink.download = `music-track-${Date.now()}.mp3`;
+  safeDownloadLink.style.display = "inline";
 }
 
 function updateWalletBadge() {
@@ -121,6 +139,7 @@ async function runPayment(prompt: string, seconds: number) {
 
   setStatus("Requesting payment requirements…");
   safePayButton.disabled = true;
+  resetTrack();
 
   try {
     const initialResponse = await fetch("/entrypoints/music/invoke", {
@@ -140,7 +159,7 @@ async function runPayment(prompt: string, seconds: number) {
       if (typeof trackUrl !== "string" || !trackUrl) {
         throw new Error("Missing trackUrl in response");
       }
-      safeAudioEl.src = trackUrl;
+      setTrack(trackUrl);
       setStatus("Ready! Press play.");
       return;
     }
@@ -204,14 +223,15 @@ async function runPayment(prompt: string, seconds: number) {
     }
 
     const trackUrl: unknown = confirmData?.trackUrl ?? confirmData?.output?.trackUrl;
-    if (typeof trackUrl !== "string" || !trackUrl) {
+   if (typeof trackUrl !== "string" || !trackUrl) {
       throw new Error("Payment succeeded but track URL missing.");
     }
 
-    safeAudioEl.src = trackUrl;
+    setTrack(trackUrl);
     setStatus("Ready! Press play.");
   } catch (error) {
     console.error("music ui error:", error);
+    resetTrack();
     setStatus(error instanceof Error ? error.message : "Payment failed.");
   } finally {
     validate();

@@ -42,6 +42,7 @@ export const EnvSchema = z.object({
     .int()
     .positive()
     .optional(),
+  ELEVENLABS_INSTRUMENTAL_ONLY: z.enum(["true", "false"]).optional(),
   AX_MODEL: z.string().trim().optional(),
   AXLLM_MODEL: z.string().trim().optional(),
   OPENAI_MODEL: z.string().trim().optional(),
@@ -106,6 +107,8 @@ export function parseEnv(input: NodeJS.ProcessEnv) {
     SETTLE_TRANSACTIONS: parsed.SETTLE_TRANSACTIONS ?? "false",
     SETTLE_PRIVATE_KEY: parsed.SETTLE_PRIVATE_KEY ?? parsed.PRIVATE_KEY,
     SETTLE_RPC_URL: parsed.SETTLE_RPC_URL ?? x402RpcUrl,
+    ELEVENLABS_INSTRUMENTAL_ONLY:
+      parsed.ELEVENLABS_INSTRUMENTAL_ONLY ?? "true",
   };
 }
 

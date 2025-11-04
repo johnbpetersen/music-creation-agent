@@ -3,34 +3,58 @@ import { getAxClient } from "./client";
 import { env } from "../config/env";
 
 const USE_REAL_LLM = env.USE_REAL_LLM === "true";
+const INSTRUMENTAL_ONLY = env.ELEVENLABS_INSTRUMENTAL_ONLY === "true";
 
 type RefineInput = {
   prompt: string;
   seconds: number;
+  instrumental: boolean;
 };
 
 const refineFlow = flow<RefineInput>()
   .node(
     "refiner",
-    'prompt:string, seconds:number -> refined:string "Rewrite the prompt into a concise music description tailored to the requested duration."'
+    'prompt:string, seconds:number, instrumental:boolean -> refined:string "Rewrite the prompt into a concise music description tailored to the requested duration. If instrumental is true, explicitly require an instrumental track with no vocals or lyrics."'
   )
   .execute("refiner", (state) => ({
     prompt: state.prompt,
     seconds: state.seconds,
+    instrumental: state.instrumental,
   }))
   .returns((state) => ({
     refined: String(state.refinerResult.refined ?? ""),
   }));
 
-function fallbackRefine(prompt: string, seconds: number) {
+function ensureInstrumentalLine(text: string) {
+  if (!INSTRUMENTAL_ONLY) return text.trim();
+
+  const normalized = text.toLowerCase();
+  if (
+    normalized.includes("instrumental") ||
+    normalized.includes("no vocals") ||
+    normalized.includes("no lyrics")
+  ) {
+    return text.trim();
+  }
+
+  return `${text.trim()} Instrumental only; no vocals or lyrics.`;
+}
+
+function fallbackRefine(prompt: string, seconds: number, instrumental: boolean) {
   const trimmed = prompt.trim();
   const safePrompt = trimmed.length > 0 ? trimmed : "the core theme";
-  return [
+  const base = [
     `Compose a ${seconds}-second cinematic chillstep hybrid inspired by "${safePrompt}".`,
     "Open with a mysterious ambient soundscape (pads, wind chimes, distant atmospheres) that swells into heroic orchestral themes with strings, brass, and taiko percussion.",
     "At the drop, blend shimmering synth arpeggios, side-chained kicks and snares, powerful sub-bass, and airy vocal chops to deliver chillstep energy.",
     "Maintain an epic fantasy mood throughout with big crescendos, choir layers, and impactful risers; close on a triumphant yet ethereal outro with lingering choir and evolving pads.",
-  ].join(" ");
+  ];
+
+  if (instrumental) {
+    base.push("The track must remain instrumental—do not include vocals or lyrics.");
+  }
+
+  return base.join(" ");
 }
 
 export async function refinePrompt(prompt: string, seconds: number) {
@@ -42,20 +66,28 @@ export async function refinePrompt(prompt: string, seconds: number) {
 
   if (!USE_REAL_LLM || !llm) {
     return {
-      refinedPrompt: fallbackRefine(trimmed, seconds),
+      refinedPrompt: ensureInstrumentalLine(
+        fallbackRefine(trimmed, seconds, INSTRUMENTAL_ONLY)
+      ),
       model: "axllm-fallback",
     };
   }
 
   try {
-    const result = await refineFlow.forward(llm, { prompt: trimmed, seconds });
+    const result = await refineFlow.forward(llm, {
+      prompt: trimmed,
+      seconds,
+      instrumental: INSTRUMENTAL_ONLY,
+    });
     const usage = refineFlow.getUsage().at(-1);
     refineFlow.resetUsage();
 
-    const refined = result.refined?.trim();
+    let refined = result.refined?.trim();
     if (!refined) {
       throw new Error("LLM returned empty refinement.");
     }
+
+    refined = ensureInstrumentalLine(refined);
 
     console.info("[ai] refined prompt", {
       seconds,
@@ -71,7 +103,9 @@ export async function refinePrompt(prompt: string, seconds: number) {
   } catch (error) {
     console.warn("[ai] refinePrompt falling back after error:", error);
     return {
-      refinedPrompt: fallbackRefine(trimmed, seconds),
+      refinedPrompt: ensureInstrumentalLine(
+        fallbackRefine(trimmed, seconds, INSTRUMENTAL_ONLY)
+      ),
       model: "axllm-fallback",
     };
   }

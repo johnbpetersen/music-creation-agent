@@ -16,6 +16,7 @@ const ELEVENLABS_PLACEHOLDER_URL =
 const USE_REAL_ELEVENLABS = env.USE_REAL_ELEVENLABS === "true";
 const ELEVENLABS_MODEL_ID = env.ELEVENLABS_MODEL_ID ?? "eleven_music_v1";
 const MAX_ELEVENLABS_SECONDS = env.ELEVENLABS_MAX_SECONDS;
+const INSTRUMENTAL_ONLY = env.ELEVENLABS_INSTRUMENTAL_ONLY === "true";
 
 function getApiKey() {
   return env.ELEVENLABS_API_KEY?.trim();
@@ -50,6 +51,11 @@ export async function generateMusicTrack({
     throw new Error("Refined prompt cannot be empty.");
   }
 
+  const enforcedPrompt =
+    INSTRUMENTAL_ONLY && !/instrumental|no vocals|no lyrics/i.test(trimmedPrompt)
+      ? `${trimmedPrompt} Instrumental only; no vocals or lyrics.`
+      : trimmedPrompt;
+
   if (!USE_REAL_ELEVENLABS) {
     return {
       trackUrl: ELEVENLABS_PLACEHOLDER_URL,
@@ -82,7 +88,7 @@ export async function generateMusicTrack({
         "xi-api-key": apiKey,
       },
       body: JSON.stringify({
-        prompt: trimmedPrompt,
+        prompt: enforcedPrompt,
         duration_seconds: seconds,
         model_id: ELEVENLABS_MODEL_ID,
       }),
