@@ -46,6 +46,9 @@ export const EnvSchema = z.object({
   AX_MODEL: z.string().trim().optional(),
   AXLLM_MODEL: z.string().trim().optional(),
   OPENAI_MODEL: z.string().trim().optional(),
+  OPENROUTER_API_KEY: z.string().trim().optional(),
+  OPENROUTER_MODEL: z.string().trim().optional(),
+  OPENROUTER_BASE_URL: z.string().trim().optional(),
 
   SETTLE_TRANSACTIONS: z.enum(["true", "false"]).optional(),
   SETTLE_PRIVATE_KEY: z
@@ -109,6 +112,9 @@ export function parseEnv(input: NodeJS.ProcessEnv) {
     SETTLE_RPC_URL: parsed.SETTLE_RPC_URL ?? x402RpcUrl,
     ELEVENLABS_INSTRUMENTAL_ONLY:
       parsed.ELEVENLABS_INSTRUMENTAL_ONLY ?? "true",
+    OPENROUTER_MODEL: parsed.OPENROUTER_MODEL ?? "deepseek/deepseek-v3.1",
+    OPENROUTER_BASE_URL:
+      parsed.OPENROUTER_BASE_URL ?? "https://openrouter.ai/api/v1",
   };
 }
 

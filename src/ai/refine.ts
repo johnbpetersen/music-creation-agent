@@ -1,6 +1,7 @@
 import { flow } from "@ax-llm/ax";
 import { getAxClient } from "./client";
 import { env } from "../config/env";
+import { isOpenRouterEnabled, refineWithOpenRouter } from "./openrouter";
 
 const USE_REAL_LLM = env.USE_REAL_LLM === "true";
 const INSTRUMENTAL_ONLY = env.ELEVENLABS_INSTRUMENTAL_ONLY === "true";
@@ -101,7 +102,26 @@ export async function refinePrompt(prompt: string, seconds: number) {
       model: usage?.model,
     };
   } catch (error) {
-    console.warn("[ai] refinePrompt falling back after error:", error);
+    console.warn("[ai] refinePrompt Ax error:", error);
+    if (isOpenRouterEnabled()) {
+      try {
+        const { refinedPrompt, model } = await refineWithOpenRouter({
+          prompt: trimmed,
+          seconds,
+          instrumental: INSTRUMENTAL_ONLY,
+        });
+        return {
+          refinedPrompt: ensureInstrumentalLine(refinedPrompt),
+          model,
+        };
+      } catch (openRouterError) {
+        console.warn(
+          "[ai] OpenRouter refine failed, using static fallback:",
+          openRouterError
+        );
+      }
+    }
+
     return {
       refinedPrompt: ensureInstrumentalLine(
         fallbackRefine(trimmed, seconds, INSTRUMENTAL_ONLY)
