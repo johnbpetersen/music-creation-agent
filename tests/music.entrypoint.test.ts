@@ -65,6 +65,7 @@ describe("music entrypoint", () => {
     expect(result.output.trackUrl).toBe(
       "https://tracks.local/lofi-focus-refined.mp3"
     );
+    expect(result.output.refinedPrompt).toBe("lofi focus refined");
     expect(result.model).toBe("stub-llm");
     expect(refineCalls).toEqual([{ prompt: "lofi focus", seconds: 45 }]);
     expect(generateCalls).toEqual([

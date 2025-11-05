@@ -42,6 +42,8 @@ const statusEl = document.getElementById("status") as HTMLParagraphElement | nul
 const walletBadge = document.getElementById("wallet-status") as HTMLSpanElement | null;
 const audioEl = document.getElementById("player") as HTMLAudioElement | null;
 const downloadLink = document.getElementById("download-link") as HTMLAnchorElement | null;
+const refinedContainer = document.getElementById("refined-container") as HTMLElement | null;
+const refinedPromptEl = document.getElementById("refined-prompt") as HTMLElement | null;
 
 if (
   !form ||
@@ -52,7 +54,9 @@ if (
   !audioEl ||
   !connectButton ||
   !walletBadge ||
-  !downloadLink
+  !downloadLink ||
+  !refinedContainer ||
+  !refinedPromptEl
 ) {
   throw new Error("UI elements missing");
 }
@@ -65,6 +69,8 @@ const safeSecondsInput = secondsInput!;
 const safeConnectButton = connectButton!;
 const safeWalletBadge = walletBadge!;
 const safeDownloadLink = downloadLink!;
+const safeRefinedContainer = refinedContainer!;
+const safeRefinedPromptEl = refinedPromptEl!;
 
 let uiReady = false;
 let currentChainId: number | null = null;
@@ -86,6 +92,8 @@ function resetTrack() {
   safeDownloadLink.style.display = "none";
   safeDownloadLink.removeAttribute("href");
   safeDownloadLink.removeAttribute("download");
+  safeRefinedContainer.style.display = "none";
+  safeRefinedPromptEl.textContent = "";
 }
 
 function setTrack(url: string, provider?: string | null) {
@@ -103,6 +111,16 @@ function setTrack(url: string, provider?: string | null) {
     safeDownloadLink.style.display = "inline";
   }
   return isPlaceholder;
+}
+
+function setRefinedPrompt(refined?: unknown) {
+  if (typeof refined === "string" && refined.trim().length > 0) {
+    safeRefinedPromptEl.textContent = refined.trim();
+    safeRefinedContainer.style.display = "block";
+  } else {
+    safeRefinedPromptEl.textContent = "";
+    safeRefinedContainer.style.display = "none";
+  }
 }
 
 function updateWalletBadge() {
@@ -170,6 +188,7 @@ async function runPayment(prompt: string, seconds: number) {
         throw new Error("Missing trackUrl in response");
       }
       const placeholder = setTrack(trackUrl, data?.provider);
+      setRefinedPrompt(data?.output?.refinedPrompt ?? data?.refinedPrompt);
       setStatus(
         placeholder
           ? "Fallback audio loaded (no download)."
@@ -248,6 +267,9 @@ async function runPayment(prompt: string, seconds: number) {
           ? confirmData.model
           : undefined;
     const placeholder = setTrack(trackUrl, provider);
+    setRefinedPrompt(
+      confirmData?.refinedPrompt ?? confirmData?.output?.refinedPrompt
+    );
     setStatus(
       placeholder
         ? "Fallback audio loaded (no download)."

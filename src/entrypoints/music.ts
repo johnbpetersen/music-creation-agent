@@ -16,6 +16,7 @@ const musicInputSchema = z.object({
 
 const musicOutputSchema = z.object({
   trackUrl: z.string().min(1),
+  refinedPrompt: z.string().optional(),
 });
 
 type MusicDependencies = {
@@ -82,6 +83,7 @@ export function createMusicEntrypoint(
         return {
           output: {
             trackUrl,
+            refinedPrompt,
           },
           model: model ?? provider,
         };

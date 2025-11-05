@@ -123,6 +123,8 @@ describe("music endpoint paywall", () => {
       const json = await res.json();
       expect(json.ok).toBe(true);
       expect(json.trackUrl).toMatch(/^https?:\/\//);
+      expect(typeof json.refinedPrompt).toBe("string");
+      expect(json.refinedPrompt.length).toBeGreaterThan(0);
       expect(verifyMock).toHaveBeenCalledTimes(1);
     } finally {
       global.fetch = originalFetch;

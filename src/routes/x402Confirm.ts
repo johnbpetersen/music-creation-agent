@@ -249,6 +249,7 @@ export function registerX402ConfirmRoute(app: Hono) {
       return c.json({
         ok: true,
         trackUrl,
+        refinedPrompt: handlerResult.output.refinedPrompt,
         price: {
           cents: priceCents,
           amountAtomic: expectedAtomic,
