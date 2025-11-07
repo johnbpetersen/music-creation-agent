@@ -12,7 +12,10 @@ const ELEVENLABS_PLACEHOLDER_URL =
   env.ELEVENLABS_PLACEHOLDER_URL ??
   "https://example.com/placeholder-track.mp3";
 
-const USE_REAL_ELEVENLABS = env.USE_REAL_ELEVENLABS === "true";
+const WANTS_REAL_ELEVENLABS = env.USE_REAL_ELEVENLABS === "true";
+const IS_TEST_ENV =
+  env.NODE_ENV === "test" || process.env.NODE_ENV === "test";
+const USE_REAL_ELEVENLABS = WANTS_REAL_ELEVENLABS && !IS_TEST_ENV;
 const MAX_ELEVENLABS_SECONDS = env.ELEVENLABS_MAX_SECONDS;
 const INSTRUMENTAL_ONLY = env.ELEVENLABS_INSTRUMENTAL_ONLY === "true";
 
@@ -21,18 +24,24 @@ function getApiKey() {
 }
 
 export function getElevenLabsStatus() {
-  const wantsLive = USE_REAL_ELEVENLABS;
   const apiKey = getApiKey();
+  const mode = USE_REAL_ELEVENLABS ? "live" : "placeholder";
+  const ready = !USE_REAL_ELEVENLABS || !!apiKey;
+  let message: string | undefined;
+
+  if (WANTS_REAL_ELEVENLABS && IS_TEST_ENV) {
+    message = "Live ElevenLabs calls are disabled while NODE_ENV=test.";
+  } else if (USE_REAL_ELEVENLABS && !apiKey) {
+    message =
+      "ELEVENLABS_API_KEY missing while USE_REAL_ELEVENLABS=true";
+  }
 
   return {
-    mode: wantsLive ? "live" : "placeholder",
-    ready: !wantsLive || !!apiKey,
-    requiresApiKey: wantsLive,
+    mode,
+    ready,
+    requiresApiKey: WANTS_REAL_ELEVENLABS,
     maxSeconds: MAX_ELEVENLABS_SECONDS,
-    message:
-      wantsLive && !apiKey
-        ? "ELEVENLABS_API_KEY missing while USE_REAL_ELEVENLABS=true"
-        : undefined,
+    message,
   };
 }
 

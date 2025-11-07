@@ -11,8 +11,18 @@ export function registerHealthRoute(app: Hono) {
 
     const elevenStatus = getElevenLabsStatus();
     const elevenReady = elevenStatus.ready;
+    const settlementRequested = env.SETTLE_TRANSACTIONS === "true";
+    const settlementHasKey =
+      typeof env.SETTLE_PRIVATE_KEY === "string" &&
+      env.SETTLE_PRIVATE_KEY.length > 0;
+    const settlementBlockedByTestEnv =
+      settlementRequested &&
+      (env.NODE_ENV === "test" || process.env.NODE_ENV === "test");
+    const settlementActive = settlementRequested && !settlementBlockedByTestEnv;
+    const settlementReady = settlementActive && settlementHasKey;
 
-    const ok = axReady && elevenReady;
+    const ok =
+      axReady && elevenReady && (!settlementActive || settlementReady);
 
     return c.json({
       ok,
@@ -30,6 +40,18 @@ export function registerHealthRoute(app: Hono) {
           ready: elevenStatus.ready,
           maxSeconds: elevenStatus.maxSeconds,
           message: elevenStatus.message,
+        },
+        settlement: {
+          requested: settlementRequested,
+          active: settlementActive,
+          ready: settlementReady,
+          message: settlementRequested
+            ? settlementBlockedByTestEnv
+              ? "Settlement disabled while NODE_ENV=test."
+              : !settlementHasKey
+                ? "SETTLE_PRIVATE_KEY missing; settlement disabled."
+                : undefined
+            : "Disabled (SETTLE_TRANSACTIONS!=true).",
         },
       },
     });

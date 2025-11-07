@@ -9,6 +9,7 @@ pnpm-debug.log*
 .env
 .env.*
 !.env.example
+!.env.buyer.example
 
 # Node/Bun dependencies
 node_modules/

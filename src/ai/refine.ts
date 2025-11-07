@@ -102,7 +102,11 @@ export async function refinePrompt(prompt: string, seconds: number) {
       model: usage?.model,
     };
   } catch (error) {
-    console.warn("[ai] refinePrompt Ax error:", error);
+    console.warn("[ai] refinePrompt Ax error", {
+      seconds,
+      promptPreview: trimmed.slice(0, 80),
+      message: error instanceof Error ? error.message : String(error),
+    });
     if (isOpenRouterEnabled()) {
       try {
         const { refinedPrompt, model } = await refineWithOpenRouter({
@@ -115,10 +119,14 @@ export async function refinePrompt(prompt: string, seconds: number) {
           model,
         };
       } catch (openRouterError) {
-        console.warn(
-          "[ai] OpenRouter refine failed, using static fallback:",
-          openRouterError
-        );
+        console.warn("[ai] OpenRouter refine failed, using static fallback", {
+          seconds,
+          promptPreview: trimmed.slice(0, 80),
+          message:
+            openRouterError instanceof Error
+              ? openRouterError.message
+              : String(openRouterError),
+        });
       }
     }
 

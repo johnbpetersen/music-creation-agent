@@ -82,9 +82,10 @@ Copy `.env.example` to `.env` and update the values that apply to your setup:
 - **Other secrets**
   - `PRIVATE_KEY` – signer key for settlement scripts (optional unless settling on-chain).
 - **Settlement (optional)**
-  - `SETTLE_TRANSACTIONS=true` – automatically broadcast ERC-3009 settle transactions after verification.
+  - `SETTLE_TRANSACTIONS=true` – automatically broadcast ERC-3009 settle transactions after verification. Defaults to `false` and is ignored during tests/CI.
   - `SETTLE_PRIVATE_KEY` – key used to settle payments (defaults to `PRIVATE_KEY` if omitted).
   - `SETTLE_RPC_URL` – RPC endpoint for the settlement chain (defaults to the chain RPC).
+  - Always ensure the settling key is funded and only enable this flag in trusted environments.
 
 Once everything is set, hit `GET /api/health` to confirm the Daydreams Ax agent and ElevenLabs integration are in the expected mode (`live` vs `fallback`).
 
@@ -93,4 +94,5 @@ Once everything is set, hit `GET /api/health` to confirm the Daydreams Ax agent 
 - Update `src/agent.ts` with your use case.
 - Wire up `@lucid-dreams/agent-kit` configuration and secrets (see `AGENTS.md` in the repo for details).
 - Copy `.env.example` to `.env` and fill in the values for your environment.
+- Copy `.env.buyer.example` to `.env.buyer` if you plan to use the music payment CLI helper.
 - Deploy with your preferred Bun-compatible platform when you're ready.

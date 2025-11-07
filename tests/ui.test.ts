@@ -161,7 +161,34 @@ describe("ui app", () => {
 
     const audioEl = {
       src: "",
+      removeAttribute() {
+        this.src = "";
+      },
+      load() {
+        /* noop */
+      },
     } as HTMLAudioElement;
+
+    const downloadLink = {
+      style: { display: "none" },
+      href: "",
+      download: "",
+      setAttribute() {
+        /* noop */
+      },
+      removeAttribute(attr: string) {
+        if (attr === "href") this.href = "";
+        if (attr === "download") this.download = "";
+      },
+    } as HTMLAnchorElement;
+
+    const refinedContainer = {
+      style: { display: "none" },
+    } as HTMLElement;
+
+    const refinedPromptEl = {
+      textContent: "",
+    } as HTMLElement;
 
     const payButton = {
       disabled: true,
@@ -206,6 +233,12 @@ describe("ui app", () => {
             return statusEl;
           case "player":
             return audioEl;
+          case "download-link":
+            return downloadLink;
+          case "refined-container":
+            return refinedContainer;
+          case "refined-prompt":
+            return refinedPromptEl;
           default:
             return null;
         }

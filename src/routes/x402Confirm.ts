@@ -23,6 +23,12 @@ const chainConfig = getChainConfig(env);
 const payToAddress: `0x${string}` =
   (env.PAY_TO as `0x${string}` | undefined) ??
   "0xb308ed39d67D0d4BAe5BC2FAEF60c66BBb6AE429";
+const isTestEnv =
+  env.NODE_ENV === "test" || process.env.NODE_ENV === "test";
+const settlementRequested = env.SETTLE_TRANSACTIONS === "true";
+const settlementKey = env.SETTLE_PRIVATE_KEY;
+const settlementKeyPresent =
+  typeof settlementKey === "string" && settlementKey.length > 0;
 
 function respondError(
   c: Context,
@@ -205,11 +211,14 @@ export function registerX402ConfirmRoute(app: Hono) {
 
     let settlementTxHash: string | undefined;
 
-    if (env.SETTLE_TRANSACTIONS === "true") {
-      const settleKey = env.SETTLE_PRIVATE_KEY;
-      if (!settleKey) {
+    if (settlementRequested) {
+      if (!settlementKeyPresent) {
         console.warn(
-          "[x402-confirm] Settlement requested but SETTLE_PRIVATE_KEY missing"
+          "[x402-confirm] Settlement requested but SETTLE_PRIVATE_KEY missing; skipping broadcast."
+        );
+      } else if (isTestEnv) {
+        console.info(
+          "[x402-confirm] Settlement disabled in test environment; skipping broadcast."
         );
       } else {
         try {
@@ -221,7 +230,7 @@ export function registerX402ConfirmRoute(app: Hono) {
             usdcContract: chainConfig.usdcAddress as `0x${string}`,
             chainId: chainConfig.chainId,
             rpcUrl: env.SETTLE_RPC_URL ?? chainConfig.rpcUrl,
-            privateKey: settleKey as `0x${string}`,
+            privateKey: settlementKey as `0x${string}`,
           });
           console.info("[x402-confirm] Settlement broadcast", {
             txHash: settlementTxHash,

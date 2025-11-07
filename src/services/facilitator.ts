@@ -92,6 +92,10 @@ export async function verifyAuthorizationWithFacilitator(
   });
 
   if (!(res instanceof Response)) {
+    console.warn("[facilitator] verify request failed", {
+      status: res.status,
+      message: res.message,
+    });
     return res;
   }
 
@@ -127,12 +131,17 @@ export async function verifyAuthorizationWithFacilitator(
       json?.error?.message ??
       json?.message ??
       `Facilitator returned ${status}`;
-    return {
+    const failure: FacilitatorVerifyFailure = {
       ok: false,
       status,
       message,
       detail: text,
     };
+    console.warn("[facilitator] verification rejected", {
+      status,
+      message,
+    });
+    return failure;
   }
 
   const verified =
@@ -143,12 +152,17 @@ export async function verifyAuthorizationWithFacilitator(
   if (!verified) {
     const message =
       json?.error?.message ?? "Facilitator did not verify authorization";
-    return {
+    const failure: FacilitatorVerifyFailure = {
       ok: false,
       status,
       message,
       detail: text,
     };
+    console.warn("[facilitator] verification invalid", {
+      status,
+      message,
+    });
+    return failure;
   }
 
   const amountPaid =
@@ -164,36 +178,42 @@ export async function verifyAuthorizationWithFacilitator(
     responseTo &&
     normalizeHex(responseTo) !== normalizeHex(expected.payTo)
   ) {
-    return {
+    const failure: FacilitatorVerifyFailure = {
       ok: false,
       status,
       message: "Payment sent to wrong address",
       detail: `Expected ${expected.payTo}, got ${responseTo}`,
     };
+    console.warn("[facilitator] verification mismatch", failure);
+    return failure;
   }
 
   if (
     responseAsset &&
     normalizeHex(responseAsset) !== normalizeHex(expected.asset)
   ) {
-    return {
+    const failure: FacilitatorVerifyFailure = {
       ok: false,
       status,
       message: "Wrong asset used for payment",
       detail: `Expected ${expected.asset}, got ${responseAsset}`,
     };
+    console.warn("[facilitator] verification mismatch", failure);
+    return failure;
   }
 
   if (
     responseChain &&
     responseChain.toLowerCase() !== expected.chain.toLowerCase()
   ) {
-    return {
+    const failure: FacilitatorVerifyFailure = {
       ok: false,
       status,
       message: "Payment made on wrong network",
       detail: `Expected ${expected.chain}, got ${responseChain}`,
     };
+    console.warn("[facilitator] verification mismatch", failure);
+    return failure;
   }
 
   return {
