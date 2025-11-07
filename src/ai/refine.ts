@@ -43,19 +43,20 @@ function ensureInstrumentalLine(text: string) {
 
 function fallbackRefine(prompt: string, seconds: number, instrumental: boolean) {
   const trimmed = prompt.trim();
-  const safePrompt = trimmed.length > 0 ? trimmed : "the core theme";
-  const base = [
-    `Compose a ${seconds}-second cinematic chillstep hybrid inspired by "${safePrompt}".`,
-    "Open with a mysterious ambient soundscape (pads, wind chimes, distant atmospheres) that swells into heroic orchestral themes with strings, brass, and taiko percussion.",
-    "At the drop, blend shimmering synth arpeggios, side-chained kicks and snares, powerful sub-bass, and airy vocal chops to deliver chillstep energy.",
-    "Maintain an epic fantasy mood throughout with big crescendos, choir layers, and impactful risers; close on a triumphant yet ethereal outro with lingering choir and evolving pads.",
+  const safePrompt = trimmed.length > 0 ? trimmed : "original idea";
+  const segments = [
+    safePrompt,
+    `Run time should land around ${seconds} seconds with a clear intro, build, peak, and resolved ending.`,
+    "Keep the arrangement cohesive so the full duration feels intentional.",
   ];
 
   if (instrumental) {
-    base.push("The track must remain instrumental—do not include vocals or lyrics.");
+    segments.push("Instrumental only; no vocals or lyrics.");
   }
 
-  return base.join(" ");
+  segments.push("Add subtle transitions so the energy evolves without feeling repetitive.");
+
+  return segments.join(" ");
 }
 
 export async function refinePrompt(prompt: string, seconds: number) {

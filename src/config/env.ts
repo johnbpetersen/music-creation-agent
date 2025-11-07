@@ -2,6 +2,8 @@ import { z } from "zod";
 
 const addressRegex = /^0x[a-fA-F0-9]{40}$/;
 const privateKeyRegex = /^0x[a-fA-F0-9]{64}$/;
+export const DAYDREAMS_FACILITATOR_URL =
+  "https://facilitator.daydreams.systems";
 
 export const EnvSchema = z.object({
   NODE_ENV: z.string().optional(),
@@ -15,7 +17,7 @@ export const EnvSchema = z.object({
     .string()
     .trim()
     .url()
-    .default("https://facilitator.daydreams.systems"),
+    .default(DAYDREAMS_FACILITATOR_URL),
   PAY_TO: z
     .string()
     .trim()

@@ -76,6 +76,19 @@ registerHealthRoute(app);
 registerAxChallengeRoute(app);
 
 const paymentsConfig = config.payments;
+const facilitatorUrlString =
+  typeof paymentsConfig.facilitatorUrl === "string"
+    ? paymentsConfig.facilitatorUrl
+    : String(paymentsConfig.facilitatorUrl ?? "");
+if (facilitatorUrlString.includes("daydreams.systems")) {
+  console.info("[payments] Using Daydreams facilitator", {
+    url: facilitatorUrlString,
+  });
+} else {
+  console.warn("[payments] Non-Daydreams facilitator configured", {
+    url: facilitatorUrlString,
+  });
+}
 const musicPayTo =
   typeof paymentsConfig.payTo === "string" &&
   paymentsConfig.payTo.startsWith("0x")

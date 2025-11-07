@@ -1,15 +1,49 @@
-import { createAxLLMClient } from "@lucid-dreams/agent-kit";
+import { ai, type AxAI } from "@ax-llm/ax";
 import { privateKeyToAccount } from "viem/accounts";
+import { env } from "../config/env";
 
-const axClient = createAxLLMClient({
-  model: process.env.AX_MODEL || process.env.AXLLM_MODEL || process.env.OPENAI_MODEL || "gpt-4.1-mini",
-  logger: {
-    warn(message, error) {
-      if (error) console.warn(`[ai] ${message}`, error);
-      else console.warn(`[ai] ${message}`);
-    },
-  },
-});
+type AxClient = {
+  ax: AxAI | null;
+  isConfigured: () => boolean;
+};
+
+const MODEL_FALLBACK =
+  env.AX_MODEL ?? env.AXLLM_MODEL ?? env.OPENAI_MODEL ?? "gpt-4.1-mini";
+const OPENAI_API_KEY = (process.env.OPENAI_API_KEY ?? "").trim();
+const OPENAI_API_URL = (process.env.OPENAI_API_URL ?? "").trim();
+
+let axInstance: AxAI | null = null;
+
+if (!OPENAI_API_KEY) {
+  console.warn(
+    "[ai] OPENAI_API_KEY missing — deterministic fallbacks will be used."
+  );
+} else {
+  try {
+    axInstance = ai({
+      name: "openai",
+      apiKey: OPENAI_API_KEY,
+      ...(OPENAI_API_URL ? { apiURL: OPENAI_API_URL } : {}),
+      config: {
+        model: MODEL_FALLBACK,
+        stream: true,
+      },
+      options: {
+        debug: env.NODE_ENV !== "production",
+      },
+    });
+  } catch (error) {
+    console.warn(
+      "[ai] Failed to initialise Daydreams Ax client",
+      error instanceof Error ? error.message : error
+    );
+  }
+}
+
+const axClient: AxClient = {
+  ax: axInstance,
+  isConfigured: () => Boolean(axInstance),
+};
 
 if (!axClient.isConfigured()) {
   console.warn(
