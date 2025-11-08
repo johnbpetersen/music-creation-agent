@@ -26,12 +26,11 @@ describe("music endpoint paywall", () => {
     expect(Array.isArray(body.accepts)).toBe(true);
     expect(body.accepts.length).toBeGreaterThan(0);
 
+    const chain = getChainConfig(env);
     const requirement = body.accepts[0];
-    expect(requirement.network).toBe(getChainConfig(env).network);
+    expect(requirement.network).toBe(chain.network);
     expect(requirement.maxAmountRequired).toBe("1498500");
-    expect(requirement.asset).toBe(
-      "0x036CbD53842c5426634e7929541eC2318f3dCF7e"
-    );
+    expect(requirement.asset).toBe(chain.usdcAddress);
     expect(requirement.payTo.toLowerCase()).toMatch(/^0x[0-9a-f]{40}$/);
   });
 

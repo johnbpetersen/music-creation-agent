@@ -45,6 +45,7 @@ const agentApp = createAgentApp(
 );
 
 const { app, addEntrypoint, config } = agentApp;
+const chainConfig = getChainConfig(env);
 registerX402ConfirmRoute(app);
 registerHealthRoute(app);
 registerAxChallengeRoute(app);
@@ -118,6 +119,7 @@ if (musicPayTo) {
     createMusicPricingMiddleware({
       payTo: musicPayTo,
       facilitatorUrl: paymentsConfig.facilitatorUrl,
+      usdcAddress: chainConfig.usdcAddress,
       network: paymentsConfig.network as any,
       description: musicEntrypoint.description,
     })

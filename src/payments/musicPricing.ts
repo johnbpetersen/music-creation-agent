@@ -15,15 +15,7 @@ const DEFAULT_TIMEOUT_SECONDS = 300;
 const MIN_SECONDS_BILLED = 5;
 const USDC_MICRO_PER_SECOND = 33_300n; // $0.0333 per second
 export const USD_RATE_PER_SECOND = Number(USDC_MICRO_PER_SECOND) / 1_000_000;
-
-export const USDC_BASE_SEPOLIA_ASSET = {
-  address: "0x036CbD53842c5426634e7929541eC2318f3dCF7e" as const,
-  decimals: 6,
-  eip712: {
-    name: "USDC",
-    version: "2",
-  },
-};
+export const USDC_EIP712_EXTRA = { name: "USDC", version: "2" } as const;
 
 const requestSchema = toJsonSchemaOrUndefined(musicInputSchema);
 const responseSchema = toJsonSchemaOrUndefined(musicOutputSchema);
@@ -60,6 +52,7 @@ function deriveSeconds(body: unknown): number | undefined {
 export type MusicPricingOptions = {
   payTo: `0x${string}`;
   facilitatorUrl: Resource;
+  usdcAddress: `0x${string}`;
   network?: Network;
   description?: string;
 };
@@ -77,6 +70,7 @@ export function getMusicPrice(seconds: number): {
 export function createMusicPricingMiddleware({
   payTo,
   facilitatorUrl,
+  usdcAddress,
   network = DEFAULT_NETWORK,
   description = musicEntrypoint.description ?? "Music generation entrypoint",
 }: MusicPricingOptions): MiddlewareHandler {
@@ -119,7 +113,11 @@ export function createMusicPricingMiddleware({
         [MUSIC_ROUTE_KEY]: {
           price: {
             amount: priceAtomic,
-            asset: USDC_BASE_SEPOLIA_ASSET,
+            asset: {
+              address: usdcAddress,
+              decimals: 6,
+              eip712: USDC_EIP712_EXTRA,
+            },
           },
           network,
           config: {
@@ -144,4 +142,3 @@ export { MUSIC_PATH };
 export const MUSIC_INPUT_STRUCTURE = inputStructure;
 export const MUSIC_OUTPUT_STRUCTURE = outputStructure;
 export const MUSIC_DEFAULT_TIMEOUT_SECONDS = DEFAULT_TIMEOUT_SECONDS;
-export const USDC_EIP712_EXTRA = USDC_BASE_SEPOLIA_ASSET.eip712;
