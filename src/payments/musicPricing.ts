@@ -12,6 +12,9 @@ const MUSIC_ROUTE_KEY = "POST /entrypoints/music/invoke";
 const MUSIC_PATH = "/entrypoints/music/invoke";
 const DEFAULT_NETWORK: Network = "base-sepolia";
 const DEFAULT_TIMEOUT_SECONDS = 300;
+const MIN_SECONDS_BILLED = 5;
+const USDC_MICRO_PER_SECOND = 33_300n; // $0.0333 per second
+export const USD_RATE_PER_SECOND = Number(USDC_MICRO_PER_SECOND) / 1_000_000;
 
 export const USDC_BASE_SEPOLIA_ASSET = {
   address: "0x036CbD53842c5426634e7929541eC2318f3dCF7e" as const,
@@ -37,12 +40,6 @@ const inputStructure =
 
 const outputStructure =
   responseSchema !== undefined ? { output: responseSchema } : undefined;
-
-function centsToAtomicAmount(cents: number): string {
-  // USDC has 6 decimals, so shift cents (10^-2) by 6 -> multiply by 10^4.
-  const atomic = BigInt(Math.max(0, cents)) * 10_000n;
-  return atomic.toString();
-}
 
 function deriveSeconds(body: unknown): number | undefined {
   if (
@@ -71,8 +68,10 @@ export function getMusicPrice(seconds: number): {
   cents: number;
   atomic: string;
 } {
-  const cents = Math.max(0, Math.floor(seconds) * 5);
-  return { cents, atomic: centsToAtomicAmount(cents) };
+  const billedSeconds = Math.max(MIN_SECONDS_BILLED, Math.floor(seconds));
+  const atomicAmount = BigInt(billedSeconds) * USDC_MICRO_PER_SECOND;
+  const cents = Number(atomicAmount) / 10_000;
+  return { cents, atomic: atomicAmount.toString() };
 }
 
 export function createMusicPricingMiddleware({
@@ -104,10 +103,11 @@ export function createMusicPricingMiddleware({
     }
 
     const { cents: priceCents, atomic: priceAtomic } = getMusicPrice(seconds);
+    const priceUsd = priceCents / 100;
     console.info(
       "[music-payments] computed price",
-      priceCents,
-      "cents (atomic",
+      `${priceUsd.toFixed(4)} USD`,
+      "(atomic",
       priceAtomic,
       ") for",
       c.req.url

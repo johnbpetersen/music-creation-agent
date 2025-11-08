@@ -27,8 +27,8 @@ describe("music endpoint paywall", () => {
     expect(body.accepts.length).toBeGreaterThan(0);
 
     const requirement = body.accepts[0];
-    expect(requirement.network).toBe("base-sepolia");
-    expect(requirement.maxAmountRequired).toBe("2250000");
+    expect(requirement.network).toBe(getChainConfig(env).network);
+    expect(requirement.maxAmountRequired).toBe("1498500");
     expect(requirement.asset).toBe(
       "0x036CbD53842c5426634e7929541eC2318f3dCF7e"
     );
@@ -125,7 +125,18 @@ describe("music endpoint paywall", () => {
       expect(json.trackUrl).toMatch(/^https?:\/\//);
       expect(typeof json.refinedPrompt).toBe("string");
       expect(json.refinedPrompt.length).toBeGreaterThan(0);
-      expect(verifyMock).toHaveBeenCalledTimes(1);
+      const verifyHits = verifyMock.mock.calls.filter(([input]) => {
+        const url =
+          typeof input === "string"
+            ? input
+            : input instanceof URL
+            ? input.toString()
+            : input instanceof Request
+            ? input.url
+            : "";
+        return url.endsWith("/verify");
+      }).length;
+      expect(verifyHits).toBe(1);
     } finally {
       global.fetch = originalFetch;
     }

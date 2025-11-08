@@ -3,7 +3,7 @@
 ### Overview
 
 1. Client POSTs `/entrypoints/music/invoke`.
-2. Middleware (`createMusicPricingMiddleware`) prices the request: `price = seconds * 5¢`, rejects unpaid requests with `402` + x402 requirements.
+2. Middleware (`createMusicPricingMiddleware`) prices the request: `price = seconds * $0.0333` (≈$2/minute), rejects unpaid requests with `402` + x402 requirements.
 3. Buyer signs an ERC‑3009 authorization and replays the request with `X-PAYMENT`.
 4. Server verifies via the Daydreams facilitator (`/verify`) and, if enabled, settles to the `PAY_TO` wallet using `transferWithAuthorization`.
 5. Music entrypoint runs Ax refinement + ElevenLabs generation and returns the track.
@@ -49,7 +49,7 @@ Reads `.env.buyer`, performs the 402 round-trip, signs the authorization (with `
 
 ### Pricing guardrails
 
-- Price is deterministic (`seconds * 5¢`). The middleware parses `input.seconds`, clamps to integers, and ensures the facilitator payload matches the required amount.
+- Price is deterministic (`seconds * $0.0333`). The middleware parses `input.seconds`, clamps to integers, and ensures the facilitator payload matches the required amount.
 - `/api/x402/confirm` re-computes the price and rejects mismatched authorizations (`WRONG_AMOUNT`, `WRONG_RECIPIENT`, `WRONG_NETWORK` errors).
 
 ### Health & telemetry

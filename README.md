@@ -36,7 +36,7 @@ curl -X POST http://localhost:8787/entrypoints/music/invoke \
   -d '{"input":{"prompt":"upbeat synthwave", "seconds":45}}'
 ```
 
-The music entrypoint applies a dynamic paywall where the price equals `seconds * 5` cents (Base Sepolia USDC). An unpaid call returns the x402 `accepts` requirements with that per-request rate.
+The music entrypoint applies a dynamic paywall where the price equals `seconds * $0.0333` (Base USDC, $2.00 per minute). An unpaid call returns the x402 `accepts` requirements with that per-request rate.
 
 Use the helper script to exercise the flow:
 
