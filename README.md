@@ -55,6 +55,7 @@ When payments are required for other entrypoints, wrap the request with `scripts
 1. Bundle the client: `bun run ui:build`
 2. Start the server: `bun run dev`
 3. Visit [http://localhost:8787/ui](http://localhost:8787/ui), connect your wallet, enter a prompt + duration, then click **Pay & Create**. The UI signs an ERC-3009 authorization with your wallet and replays the request with the payment header.
+4. Production demo: [https://music-creation-agent-production.up.railway.app/ui](https://music-creation-agent-production.up.railway.app/ui)
 
 ### Environment configuration
 

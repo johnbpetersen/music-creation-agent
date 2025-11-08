@@ -1,5 +1,7 @@
 ## Browser UI Walkthrough
 
+Live deployment: `https://music-creation-agent-production.up.railway.app/ui`
+
 ### Build & Serve
 
 ```bash

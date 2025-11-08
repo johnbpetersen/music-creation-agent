@@ -36,7 +36,7 @@ bun install
 bun run dev
 ```
 
-This boots the Hono server, x402 middleware, and serves `/ui`.
+This boots the Hono server, x402 middleware, and serves `/ui`. Production UI lives at `https://music-creation-agent-production.up.railway.app/ui`.
 
 ### Health check
 
