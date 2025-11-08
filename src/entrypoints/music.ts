@@ -42,6 +42,7 @@ export function createMusicEntrypoint(
     key: "music",
     description:
       "Refine a music prompt with Ax LLM and render a track via ElevenLabs. Pricing: $0.0333 per second (USDC via x402).",
+    price: "dynamic ($0.0333 per second, 5s minimum)",
     input: musicInputSchema,
     output: musicOutputSchema,
     async handler(ctx: HandlerCtx) {
