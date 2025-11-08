@@ -15,6 +15,7 @@ The dev command runs `bun` in watch mode, starts the HTTP server, and reloads wh
 
 - `src/agent.ts` – defines your agent manifest and entrypoints.
 - `src/index.ts` – boots a Bun HTTP server with the agent.
+- See [`docs/`](docs/README.md) for detailed Daydreams-focused setup, payment, LLM, and UI guides prepared for the bounty review.
 
 ### Available scripts
 
