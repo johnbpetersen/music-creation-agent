@@ -8,5 +8,6 @@ This repo implements the Daydreams music creation agent: paid Ax-powered prompt 
 | [payments.md](payments.md) | x402 flow, facilitator expectations, CLI walkthrough, settlement + on-chain verification. |
 | [llm-and-audio.md](llm-and-audio.md) | Daydreams Ax wiring, fallback behavior, ElevenLabs live vs placeholder, troubleshooting. |
 | [ui.md](ui.md) | Browser UI build steps, wallet support, how to validate the full experience in `/ui`. |
+| [validation.md](validation.md) | Happy-path checklist covering CLI + UI runs, log inspection, Ax usage, and explorer verification. |
 
 The README keeps a short overview of the repo; these docs give the level of detail the Daydreams team requested. Let us know if you’d like the material mirrored in another format.

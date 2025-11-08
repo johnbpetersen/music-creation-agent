@@ -1,7 +1,4 @@
-import { z } from "zod";
 import { createAgentApp, AgentKitConfig } from "@lucid-dreams/agent-kit";
-import { flow } from "@ax-llm/ax";
-import { getAxClient } from "./ai/client";
 import { musicEntrypoint } from "./entrypoints/music";
 import {
   createMusicPricingMiddleware,
@@ -34,36 +31,12 @@ const configOverrides: AgentKitConfig = {
   },
 };
 
-const axClient = getAxClient();
-
-const brainstormingFlow = flow<{ topic: string }>()
-  .node(
-    "summarizer",
-    'topic:string -> summary:string "Two concise sentences describing the topic."'
-  )
-  .node(
-    "ideaGenerator",
-    'summary:string -> ideas:string[] "Three short follow-up ideas."'
-  )
-  .execute("summarizer", (state) => ({
-    topic: state.topic,
-  }))
-  .execute("ideaGenerator", (state) => ({
-    summary: state.summarizerResult.summary as string,
-  }))
-  .returns((state) => ({
-    summary: state.summarizerResult.summary as string,
-    ideas: Array.isArray(state.ideaGeneratorResult.ideas)
-      ? (state.ideaGeneratorResult.ideas as string[])
-      : [],
-  }));
-
 const agentApp = createAgentApp(
   {
-    name: "ax-flow-agent",
-    version: "0.0.1",
+    name: "daydreams-music-maker",
+    version: "1.0.0",
     description:
-      "Demonstrates driving an AxFlow pipeline through createAxLLMClient.",
+      "Paid Ax-refined music generation with ElevenLabs audio and x402 settlements on Base.",
   },
   {
     config: configOverrides,
@@ -110,62 +83,6 @@ if (musicPayTo) {
     "[agent-kit:music-payments] Unable to initialise music pricing middleware; payTo must be an EVM address."
   );
 }
-
-addEntrypoint({
-  key: "brainstorm",
-  description:
-    "Summarise a topic and suggest three follow-up ideas using AxFlow.",
-  input: z.object({
-    topic: z
-      .string()
-      .min(1, { message: "Provide a topic to analyse." })
-      .describe("High level topic to explore."),
-  }),
-  price: "0.003",
-  output: z.object({
-    summary: z.string(),
-    ideas: z.array(z.string()),
-  }),
-  async handler(ctx) {
-    try {
-      const topic = String(ctx.input.topic ?? "").trim();
-      if (!topic) {
-        throw new Error("Topic cannot be empty.");
-      }
-
-      const llm = axClient.ax;
-      if (!llm) {
-        const fallbackSummary = `AxFlow is not configured. Pretend summary for "${topic}".`;
-        return {
-          output: {
-            summary: fallbackSummary,
-            ideas: [
-              "Set OPENAI_API_KEY to enable the Ax integration.",
-              "Keep DEFAULT_PRICE small while testing.",
-              "Ensure PRIVATE_KEY/PAY_TO are correct.",
-            ],
-          },
-          model: "axllm-fallback",
-        };
-      }
-
-      const result = await brainstormingFlow.forward(llm, { topic });
-      const usageEntry = brainstormingFlow.getUsage().at(-1);
-      brainstormingFlow.resetUsage();
-
-      return {
-        output: {
-          summary: result.summary ?? "",
-          ideas: Array.isArray(result.ideas) ? result.ideas : [],
-        },
-        model: usageEntry?.model,
-      };
-    } catch (error) {
-      console.error("[agent] brainstorm handler failed:", error);
-      throw error;
-    }
-  },
-});
 
 addEntrypoint(musicEntrypoint);
 

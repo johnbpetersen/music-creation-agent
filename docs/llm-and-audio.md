@@ -26,6 +26,7 @@
 ### Ax troubleshooting
 
 - `/api/ax/challenge` hits `https://api-beta.daydreams.systems/v1/chat/completions` with `model:gpt-5` and returns the raw response (status, body) for debugging.
+- `bun run scripts/daydreams-check.ts` calls both `/api/health` and `/api/ax/challenge`, printing their JSON payloads so you can capture Daydreams readiness in one command (set `API_BASE_URL` if you’re targeting a remote deployment).
 - Logs:
   - `[ai] refinePrompt Ax error { message }` includes prompt preview and attempt metadata.
   - `[ai] OpenRouter refine failed ...` clarifies when fallbacks are rate-limited.
