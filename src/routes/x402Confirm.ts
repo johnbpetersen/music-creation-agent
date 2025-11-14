@@ -3,7 +3,7 @@ import type { Context, Hono } from "hono";
 import { exact } from "x402/schemes";
 import { PaymentRequirementsSchema } from "x402/types";
 import { musicEntrypoint, musicInputSchema } from "../entrypoints/music";
-import { env } from "../config/env";
+import { env, DAYDREAMS_FACILITATOR_URL } from "../config/env";
 import { getChainConfig } from "../config/chain";
 import {
   getMusicPrice,
@@ -265,7 +265,10 @@ export function registerX402ConfirmRoute(app: Hono) {
     });
 
     const isTestEnv = isTestEnvironment();
-    const settlementRequested = env.SETTLE_TRANSACTIONS === "true";
+    const facilitatorHandlesSettlement =
+      env.FACILITATOR_URL === DAYDREAMS_FACILITATOR_URL;
+    const wantsLocalSettlement = env.SETTLE_TRANSACTIONS === "true";
+    const settlementRequested = wantsLocalSettlement && !facilitatorHandlesSettlement;
     const settlementKey = env.SETTLE_PRIVATE_KEY;
     const settlementKeyPresent =
       typeof settlementKey === "string" && settlementKey.length > 0;
@@ -344,6 +347,11 @@ export function registerX402ConfirmRoute(app: Hono) {
           );
         }
       }
+    } else if (wantsLocalSettlement && facilitatorHandlesSettlement) {
+      console.info(
+        "[x402-confirm] Settlement skipped (facilitator-managed)",
+        { confirmId, facilitator: env.FACILITATOR_URL }
+      );
     }
 
     const controller = new AbortController();
