@@ -10,6 +10,7 @@ export interface UiChainConfig {
   usdcAddress: `0x${string}`;
   facilitatorUrl: string;
   payTo: `0x${string}`;
+  usdRatePerSecond: number;
 }
 
 let cachedConfig: UiChainConfig | null = null;
@@ -37,7 +38,8 @@ export async function fetchUiChainConfig(): Promise<UiChainConfig> {
     typeof data.explorerUrl !== "string" ||
     typeof data.usdcAddress !== "string" ||
     typeof data.facilitatorUrl !== "string" ||
-    typeof data.payTo !== "string"
+    typeof data.payTo !== "string" ||
+    typeof data.usdRatePerSecond !== "number"
   ) {
     throw new Error("Malformed UI config response");
   }
@@ -52,6 +54,7 @@ export async function fetchUiChainConfig(): Promise<UiChainConfig> {
     usdcAddress: data.usdcAddress as `0x${string}`,
     facilitatorUrl: data.facilitatorUrl,
     payTo: data.payTo as `0x${string}`,
+    usdRatePerSecond: data.usdRatePerSecond,
   };
 
   return cachedConfig;

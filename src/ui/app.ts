@@ -44,6 +44,11 @@ const audioEl = document.getElementById("player") as HTMLAudioElement | null;
 const downloadLink = document.getElementById("download-link") as HTMLAnchorElement | null;
 const refinedContainer = document.getElementById("refined-container") as HTMLElement | null;
 const refinedPromptEl = document.getElementById("refined-prompt") as HTMLElement | null;
+const pricePreview = document.getElementById("price-preview") as HTMLElement | null;
+const stateIndicator = document.getElementById("state-indicator") as HTMLElement | null;
+const trackUrlRow = document.getElementById("track-url-row") as HTMLElement | null;
+const trackUrlValue = document.getElementById("track-url-value") as HTMLElement | null;
+const copyTrackButton = document.getElementById("copy-track") as HTMLButtonElement | null;
 
 if (
   !form ||
@@ -56,7 +61,12 @@ if (
   !walletBadge ||
   !downloadLink ||
   !refinedContainer ||
-  !refinedPromptEl
+  !refinedPromptEl ||
+  !pricePreview ||
+  !stateIndicator ||
+  !trackUrlRow ||
+  !trackUrlValue ||
+  !copyTrackButton
 ) {
   throw new Error("UI elements missing");
 }
@@ -71,15 +81,61 @@ const safeWalletBadge = walletBadge!;
 const safeDownloadLink = downloadLink!;
 const safeRefinedContainer = refinedContainer!;
 const safeRefinedPromptEl = refinedPromptEl!;
+const safePricePreview = pricePreview!;
+const safeStateIndicator = stateIndicator!;
+const safeTrackUrlRow = trackUrlRow!;
+const safeTrackUrlValue = trackUrlValue!;
+const safeCopyTrackButton = copyTrackButton!;
+
+const DEFAULT_USD_RATE_PER_SECOND = 0.0333;
+const MIN_SECONDS = 5;
+const MAX_SECONDS = 120;
+
+type UiState = "ready" | "paying" | "generating" | "done" | "error";
 
 let uiReady = false;
 let currentChainId: number | null = null;
 let currentNetwork: UiNetwork | null = null;
+let usdRatePerSecond = DEFAULT_USD_RATE_PER_SECOND;
+
+const uiStateLabels: Record<UiState, string> = {
+  ready: "Ready",
+  paying: "Awaiting payment",
+  generating: "Generating",
+  done: "Ready to play",
+  error: "Needs attention",
+};
+
+function setUiState(state: UiState) {
+  safeStateIndicator.dataset.state = state;
+  safeStateIndicator.textContent = uiStateLabels[state] ?? state;
+}
+
+function clampSeconds(value: number) {
+  return Math.max(MIN_SECONDS, Math.min(MAX_SECONDS, value));
+}
 
 function sanitizeSeconds(value: string) {
   const parsed = Number(value);
   if (!Number.isFinite(parsed)) return NaN;
-  return Math.floor(parsed);
+  const floored = Math.floor(parsed);
+  if (!Number.isFinite(floored)) return NaN;
+  return clampSeconds(floored);
+}
+
+function updatePricePreview(explicitSeconds?: number) {
+  const seconds =
+    typeof explicitSeconds === "number" && Number.isFinite(explicitSeconds)
+      ? explicitSeconds
+      : sanitizeSeconds(safeSecondsInput.value);
+
+  if (!Number.isFinite(seconds)) {
+    safePricePreview.textContent = "$0.00";
+    return;
+  }
+
+  const price = seconds * usdRatePerSecond;
+  safePricePreview.textContent = `$${price.toFixed(2)}`;
 }
 
 function setStatus(message: string) {
@@ -94,6 +150,10 @@ function resetTrack() {
   safeDownloadLink.removeAttribute("download");
   safeRefinedContainer.style.display = "none";
   safeRefinedPromptEl.textContent = "";
+  safeTrackUrlValue.textContent = "";
+  safeTrackUrlRow.style.display = "none";
+  safeCopyTrackButton.disabled = true;
+  safeCopyTrackButton.textContent = "Copy link";
 }
 
 function setTrack(url: string, provider?: string | null) {
@@ -110,6 +170,10 @@ function setTrack(url: string, provider?: string | null) {
     safeDownloadLink.download = `music-track-${Date.now()}.mp3`;
     safeDownloadLink.style.display = "inline";
   }
+  safeTrackUrlValue.textContent = url;
+  safeTrackUrlRow.style.display = "block";
+  safeCopyTrackButton.disabled = false;
+  safeCopyTrackButton.textContent = "Copy link";
   return isPlaceholder;
 }
 
@@ -147,10 +211,11 @@ function validate() {
   const validInput =
     prompt.length > 0 &&
     Number.isInteger(seconds) &&
-    seconds >= 5 &&
-    seconds <= 120;
+    seconds >= MIN_SECONDS &&
+    seconds <= MAX_SECONDS;
   const walletConnected = isWalletReady(currentChainId);
   safePayButton.disabled = !(uiReady && validInput && walletConnected);
+  updatePricePreview(seconds);
 }
 
 async function runPayment(prompt: string, seconds: number) {
@@ -165,6 +230,7 @@ async function runPayment(prompt: string, seconds: number) {
     return;
   }
 
+  setUiState("paying");
   setStatus("Requesting payment requirements…");
   safePayButton.disabled = true;
   resetTrack();
@@ -183,6 +249,7 @@ async function runPayment(prompt: string, seconds: number) {
       }
 
       const data = await initialResponse.json();
+      setUiState("generating");
       const trackUrl: unknown = data?.output?.trackUrl;
       if (typeof trackUrl !== "string" || !trackUrl) {
         throw new Error("Missing trackUrl in response");
@@ -194,6 +261,7 @@ async function runPayment(prompt: string, seconds: number) {
           ? "Fallback audio loaded (no download)."
           : "Ready! Press play."
       );
+      setUiState("done");
       return;
     }
 
@@ -231,6 +299,7 @@ async function runPayment(prompt: string, seconds: number) {
     );
 
     setStatus("Submitting payment…");
+    setUiState("generating");
 
     const confirmResponse = await fetch("/api/x402/confirm", {
       method: "POST",
@@ -275,10 +344,12 @@ async function runPayment(prompt: string, seconds: number) {
         ? "Fallback audio loaded (no download)."
         : "Ready! Press play."
     );
+    setUiState("done");
   } catch (error) {
     console.error("music ui error:", error);
     resetTrack();
     setStatus(error instanceof Error ? error.message : "Payment failed.");
+    setUiState("error");
   } finally {
     validate();
   }
@@ -290,21 +361,57 @@ async function init() {
     configureWallet(config);
     currentChainId = config.chainId;
     currentNetwork = config.network;
+    usdRatePerSecond =
+      typeof config.usdRatePerSecond === "number"
+        ? config.usdRatePerSecond
+        : DEFAULT_USD_RATE_PER_SECOND;
     uiReady = true;
     setStatus("Wallet not connected.");
+    setUiState("ready");
     validate();
   } catch (error) {
     console.error("Failed to initialise UI config:", error);
     setStatus("Failed to load configuration. Refresh and try again.");
+    setUiState("error");
   }
 }
 
 safePromptInput.addEventListener("input", validate);
-safeSecondsInput.addEventListener("input", validate);
+safeSecondsInput.addEventListener("input", () => {
+  updatePricePreview();
+  validate();
+});
+safeSecondsInput.addEventListener("blur", () => {
+  const sanitized = sanitizeSeconds(safeSecondsInput.value);
+  if (Number.isFinite(sanitized)) {
+    safeSecondsInput.value = `${sanitized}`;
+  }
+  updatePricePreview(sanitized);
+  validate();
+});
 
 subscribeWallet(() => {
   updateWalletBadge();
   validate();
+});
+
+safeCopyTrackButton.addEventListener("click", async () => {
+  const url = safeTrackUrlValue.textContent?.trim();
+  if (!url) return;
+  if (!navigator?.clipboard?.writeText) {
+    setStatus("Clipboard is unavailable in this browser.");
+    return;
+  }
+  try {
+    await navigator.clipboard.writeText(url);
+    safeCopyTrackButton.textContent = "Copied!";
+    setTimeout(() => {
+      safeCopyTrackButton.textContent = "Copy link";
+    }, 1500);
+  } catch (error) {
+    console.error("Failed to copy track URL:", error);
+    setStatus("Failed to copy link. Copy it manually above.");
+  }
 });
 
 safeConnectButton.addEventListener("click", async () => {
@@ -312,6 +419,7 @@ safeConnectButton.addEventListener("click", async () => {
   if (isConnected) {
     disconnectWallet();
     setStatus("Wallet disconnected.");
+    setUiState("ready");
     validate();
     return;
   }
@@ -320,9 +428,11 @@ safeConnectButton.addEventListener("click", async () => {
   try {
     await connectWallet("coinbase");
     setStatus("Wallet connected. Ready to pay.");
+    setUiState("ready");
   } catch (error: any) {
     console.error("Wallet connect failed:", error);
     setStatus(error?.message || "Failed to connect wallet.");
+    setUiState("error");
   } finally {
     validate();
   }

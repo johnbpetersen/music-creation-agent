@@ -2,17 +2,26 @@ import { app } from "./agent";
 import { getChainConfig } from "./config/chain";
 import { env } from "./config/env";
 import { join } from "path";
+import { USD_RATE_PER_SECOND } from "./payments/musicPricing";
 
 const uiRoot = join(import.meta.dir, "../public/ui");
 
 async function maybeServeUi(req: Request): Promise<Response | null> {
   const url = new URL(req.url);
-  if (url.pathname === "/ui" || url.pathname === "/ui/") {
+  const serveIndex = async () => {
     const file = Bun.file(join(uiRoot, "index.html"));
     if (await file.exists()) {
       return new Response(file, { headers: { "content-type": "text/html" } });
     }
     return new Response("UI missing", { status: 404 });
+  };
+
+  if (url.pathname === "/" || url.pathname === "") {
+    return serveIndex();
+  }
+
+  if (url.pathname === "/ui" || url.pathname === "/ui/") {
+    return serveIndex();
   }
 
   if (url.pathname.startsWith("/ui/")) {
@@ -50,6 +59,7 @@ const server = Bun.serve({
         payTo:
           (env.PAY_TO as `0x${string}` | undefined) ??
           "0xb308ed39d67D0d4BAe5BC2FAEF60c66BBb6AE429",
+        usdRatePerSecond: USD_RATE_PER_SECOND,
       });
       return new Response(body, { headers: { "content-type": "application/json" } });
     }

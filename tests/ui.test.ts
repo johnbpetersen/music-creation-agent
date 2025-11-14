@@ -2,6 +2,9 @@ import { describe, expect, it, mock } from "bun:test";
 
 describe("ui app", () => {
   it("connects wallet, pays, and sets audio src", async () => {
+    let failNextConfirm = false;
+    const originalConsoleError = console.error;
+    console.error = mock(() => {});
     const fetchMock = mock(async (input: RequestInfo, init?: RequestInit) => {
       const url =
         typeof input === "string"
@@ -22,6 +25,7 @@ describe("ui app", () => {
             usdcAddress: "0x036CbD53842c5426634e7929541eC2318f3dCF7e",
             facilitatorUrl: "https://facilitator.test",
             payTo: "0x41733E18fA8FEbE0a0c350aA5B63f955F06BD363",
+            usdRatePerSecond: 0.0333,
           }),
           { status: 200, headers: { "content-type": "application/json" } }
         );
@@ -67,6 +71,9 @@ describe("ui app", () => {
       if (url.endsWith("/api/x402/confirm")) {
         const payload = init?.body ? JSON.parse(init.body as string) : {};
         expect(typeof payload.paymentHeader).toBe("string");
+        if (failNextConfirm) {
+          return new Response("boom", { status: 500 });
+        }
         return new Response(
           JSON.stringify({
             ok: true,
@@ -190,6 +197,23 @@ describe("ui app", () => {
       textContent: "",
     } as HTMLElement;
 
+    const pricePreview = {
+      textContent: "$0.00",
+    } as HTMLElement;
+
+    const stateIndicator = {
+      textContent: "",
+      dataset: { state: "ready" } as DOMStringMap,
+    } as HTMLElement;
+
+    const trackUrlRow = {
+      style: { display: "none" },
+    } as HTMLElement;
+
+    const trackUrlValue = {
+      textContent: "",
+    } as HTMLElement;
+
     const payButton = {
       disabled: true,
     } as HTMLButtonElement;
@@ -206,6 +230,14 @@ describe("ui app", () => {
     } as HTMLSpanElement;
 
     const formHandlers = new Map<string, (event: Event) => void>();
+
+    const copyButton = {
+      disabled: true,
+      textContent: "Copy link",
+      addEventListener: (type: string, handler: (event: Event) => void) => {
+        if (type === "click") events.set("copy:click", handler);
+      },
+    } as HTMLButtonElement;
 
     const formEl = {
       addEventListener: (type: string, handler: (event: Event) => void) => {
@@ -239,9 +271,27 @@ describe("ui app", () => {
             return refinedContainer;
           case "refined-prompt":
             return refinedPromptEl;
+          case "price-preview":
+            return pricePreview;
+          case "state-indicator":
+            return stateIndicator;
+          case "track-url-row":
+            return trackUrlRow;
+          case "track-url-value":
+            return trackUrlValue;
+          case "copy-track":
+            return copyButton;
           default:
             return null;
         }
+      },
+    };
+
+    (globalThis as any).navigator = {
+      clipboard: {
+        writeText: mock(async () => {
+          /* noop */
+        }),
       },
     };
 
@@ -253,19 +303,42 @@ describe("ui app", () => {
     await new Promise((resolve) => setTimeout(resolve, 0));
 
     expect(walletStatus.textContent).toContain("Connected");
+    expect(payButton.disabled).toBe(false);
+
+    const secondsInputHandler = events.get("seconds:input");
+    secondsInput.value = "60";
+    secondsInputHandler?.({} as Event);
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(pricePreview.textContent).toBe("$2.00");
 
     const submit = formHandlers.get("submit");
     submit?.({ preventDefault() {} } as unknown as Event);
 
+    expect(payButton.disabled).toBe(true);
     await new Promise((resolve) => setTimeout(resolve, 0));
 
     expect(fetchMock).toHaveBeenCalledTimes(3);
     expect(createPaymentHeader).toHaveBeenCalledTimes(1);
     expect(audioEl.src).toContain("https://tracks.local/song.mp3");
+    expect(trackUrlRow.style.display).toBe("block");
+    expect(copyButton.disabled).toBe(false);
+    expect(stateIndicator.dataset.state).toBe("done");
+    expect(payButton.disabled).toBe(false);
+
+    failNextConfirm = true;
+    submit?.({ preventDefault() {} } as unknown as Event);
+    expect(payButton.disabled).toBe(true);
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(fetchMock).toHaveBeenCalledTimes(5);
+    expect(payButton.disabled).toBe(false);
+    expect(stateIndicator.dataset.state).toBe("error");
+    expect(trackUrlRow.style.display).toBe("none");
 
     delete (globalThis as any).__walletBridge;
     delete (globalThis as any).__x402Helpers;
     delete (globalThis as any).document;
     delete (globalThis as any).window;
+    delete (globalThis as any).navigator;
+    console.error = originalConsoleError;
   });
 });
