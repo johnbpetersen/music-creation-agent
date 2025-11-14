@@ -1,6 +1,7 @@
 import { describe, expect, it, mock } from "bun:test";
 import { createSigner } from "x402-fetch";
 import { createPaymentHeader } from "x402/client";
+import { exact } from "x402/schemes";
 import type { Hex } from "x402-fetch";
 import type { PaymentRequirements } from "x402/types";
 import { app } from "../src/agent";
@@ -124,6 +125,101 @@ describe("music endpoint paywall", () => {
       expect(json.trackUrl).toMatch(/^https?:\/\//);
       expect(typeof json.refinedPrompt).toBe("string");
       expect(json.refinedPrompt.length).toBeGreaterThan(0);
+      const verifyHits = verifyMock.mock.calls.filter(([input]) => {
+        const url =
+          typeof input === "string"
+            ? input
+            : input instanceof URL
+            ? input.toString()
+            : input instanceof Request
+            ? input.url
+            : "";
+        return url.endsWith("/verify");
+      }).length;
+      expect(verifyHits).toBe(1);
+    } finally {
+      global.fetch = originalFetch;
+    }
+  });
+
+  it("rejects invalid authorization signatures", async () => {
+    const chain = getChainConfig(env);
+    const payTo =
+      (env.PAY_TO as `0x${string}` | undefined) ??
+      "0xb308ed39d67D0d4BAe5BC2FAEF60c66BBb6AE429";
+    const { atomic: requiredAtomic } = getMusicPrice(45);
+
+    const requirements: PaymentRequirements = {
+      scheme: "exact",
+      network: chain.network,
+      maxAmountRequired: requiredAtomic,
+      resource: "https://music-creation-agent.local/entrypoints/music/invoke",
+      description: "Music generation entrypoint",
+      mimeType: "application/json",
+      outputSchema: undefined,
+      payTo,
+      maxTimeoutSeconds: 300,
+      asset: chain.usdcAddress,
+      extra: { name: "USDC", version: "2" },
+    };
+
+    const signer = await createSigner(
+      chain.network,
+      "0x7957791df726a7136ab5203afc5b273c0f971b31d0b1d07e6ea7f64311bf1c55" as Hex
+    );
+
+    const paymentHeader = await createPaymentHeader(signer, 1, requirements);
+    const decoded = exact.evm.decodePayment(paymentHeader);
+    const signature = decoded.payload.signature;
+    expect(typeof signature).toBe("string");
+    const tamperedSignature =
+      signature.slice(0, -1) + (signature.endsWith("0") ? "1" : "0");
+    decoded.payload.signature = tamperedSignature as `0x${string}`;
+    const tamperedHeader = exact.evm.encodePayment(decoded);
+
+    const originalFetch = global.fetch;
+    const verifyMock = mock(
+      async (input: RequestInfo | URL, init?: RequestInit) => {
+        const url =
+          typeof input === "string"
+            ? input
+            : input instanceof URL
+            ? input.toString()
+            : input instanceof Request
+            ? input.url
+            : "";
+
+        if (url.endsWith("/verify")) {
+          return new Response(
+            JSON.stringify({
+              verified: true,
+              amountAtomic: requiredAtomic,
+            }),
+            { status: 200, headers: { "content-type": "application/json" } }
+          );
+        }
+
+        return originalFetch(input as any, init as any);
+      }
+    );
+
+    global.fetch = verifyMock as unknown as typeof fetch;
+
+    try {
+      const res = await app.fetch(
+        new Request("http://localhost/api/x402/confirm", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({
+            input: { prompt: "lofi focus", seconds: 45 },
+            paymentHeader: tamperedHeader,
+          }),
+        })
+      );
+
+      expect(res.status).toBe(400);
+      const errorJson = await res.json();
+      expect(errorJson.code).toBe("INVALID_SIGNATURE");
       const verifyHits = verifyMock.mock.calls.filter(([input]) => {
         const url =
           typeof input === "string"

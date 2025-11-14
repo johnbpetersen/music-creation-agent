@@ -12,7 +12,10 @@ import {
   MUSIC_PATH,
 } from "../payments/musicPricing";
 import { verifyAuthorizationWithFacilitator } from "../services/facilitator";
-import { settleAuthorization } from "../services/settlement";
+import {
+  settleAuthorization,
+  verifyAuthorizationSignature,
+} from "../services/settlement";
 
 const ConfirmRequestSchema = z.object({
   input: musicInputSchema,
@@ -23,12 +26,9 @@ const chainConfig = getChainConfig(env);
 const payToAddress: `0x${string}` =
   (env.PAY_TO as `0x${string}` | undefined) ??
   "0xb308ed39d67D0d4BAe5BC2FAEF60c66BBb6AE429";
-const isTestEnv =
-  env.NODE_ENV === "test" || process.env.NODE_ENV === "test";
-const settlementRequested = env.SETTLE_TRANSACTIONS === "true";
-const settlementKey = env.SETTLE_PRIVATE_KEY;
-const settlementKeyPresent =
-  typeof settlementKey === "string" && settlementKey.length > 0;
+function isTestEnvironment() {
+  return env.NODE_ENV === "test" || process.env.NODE_ENV === "test";
+}
 
 function respondError(
   c: Context,
@@ -209,12 +209,48 @@ export function registerX402ConfirmRoute(app: Hono) {
       );
     }
 
+    const isTestEnv = isTestEnvironment();
+    const settlementRequested = env.SETTLE_TRANSACTIONS === "true";
+    const settlementKey = env.SETTLE_PRIVATE_KEY;
+    const settlementKeyPresent =
+      typeof settlementKey === "string" && settlementKey.length > 0;
+
+    const signatureValid = await verifyAuthorizationSignature({
+      authorization,
+      signature,
+      chainId: chainConfig.chainId,
+      usdcContract: chainConfig.usdcAddress as `0x${string}`,
+      tokenName:
+        typeof paymentRequirements.extra?.name === "string"
+          ? paymentRequirements.extra.name
+          : "USD Coin",
+      tokenVersion:
+        typeof paymentRequirements.extra?.version === "string"
+          ? paymentRequirements.extra.version
+          : "2",
+    });
+
+    if (!signatureValid) {
+      return respondError(
+        c,
+        400,
+        "INVALID_SIGNATURE",
+        "Authorization signature failed verification."
+      );
+    }
+
     let settlementTxHash: string | undefined;
 
     if (settlementRequested) {
       if (!settlementKeyPresent) {
-        console.warn(
-          "[x402-confirm] Settlement requested but SETTLE_PRIVATE_KEY missing; skipping broadcast."
+        console.error(
+          "[x402-confirm] Settlement requested but SETTLE_PRIVATE_KEY missing; refusing to continue."
+        );
+        return respondError(
+          c,
+          500,
+          "SETTLEMENT_MISCONFIGURED",
+          "Settlement is enabled but SETTLE_PRIVATE_KEY is not configured."
         );
       } else if (isTestEnv) {
         console.info(
@@ -237,6 +273,13 @@ export function registerX402ConfirmRoute(app: Hono) {
           });
         } catch (error) {
           console.error("[x402-confirm] Settlement failed", error);
+          return respondError(
+            c,
+            502,
+            "SETTLEMENT_FAILED",
+            "Failed to settle authorization on-chain.",
+            error instanceof Error ? error.message : String(error)
+          );
         }
       }
     }

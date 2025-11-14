@@ -1,4 +1,10 @@
-import { http, createWalletClient, createPublicClient } from "viem";
+import {
+  http,
+  createWalletClient,
+  createPublicClient,
+  verifyTypedData,
+  parseSignature,
+} from "viem";
 import { privateKeyToAccount } from "viem/accounts";
 import { base, baseSepolia } from "viem/chains";
 
@@ -21,6 +27,17 @@ const TRANSFER_WITH_AUTH_ABI = [
     outputs: [],
   },
 ] as const;
+
+const TRANSFER_WITH_AUTH_TYPES = {
+  TransferWithAuthorization: [
+    { name: "from", type: "address" },
+    { name: "to", type: "address" },
+    { name: "value", type: "uint256" },
+    { name: "validAfter", type: "uint256" },
+    { name: "validBefore", type: "uint256" },
+    { name: "nonce", type: "bytes32" },
+  ],
+} as const;
 
 function splitSignature(signature: `0x${string}`) {
   if (!/^0x[0-9a-fA-F]{130}$/.test(signature)) {
@@ -111,4 +128,58 @@ export async function settleAuthorization(params: {
   await publicClient.waitForTransactionReceipt({ hash });
 
   return hash;
+}
+
+type AuthorizationLike = {
+  from: string;
+  to: string;
+  value: string | number | bigint;
+  validAfter: string | number | bigint;
+  validBefore: string | number | bigint;
+  nonce: string;
+};
+
+export async function verifyAuthorizationSignature(params: {
+  authorization: AuthorizationLike;
+  signature: string;
+  chainId: number;
+  usdcContract: `0x${string}`;
+  tokenName: string;
+  tokenVersion: string;
+}): Promise<boolean> {
+  const {
+    authorization,
+    signature,
+    chainId,
+    usdcContract,
+    tokenName,
+    tokenVersion,
+  } = params;
+
+  try {
+    const structuredSignature = parseSignature(signature as `0x${string}`);
+    return await verifyTypedData({
+      address: authorization.from as `0x${string}`,
+      domain: {
+        name: tokenName,
+        version: tokenVersion,
+        chainId,
+        verifyingContract: usdcContract,
+      },
+      types: TRANSFER_WITH_AUTH_TYPES,
+      primaryType: "TransferWithAuthorization",
+      message: {
+        from: authorization.from as `0x${string}`,
+        to: authorization.to as `0x${string}`,
+        value: BigInt(authorization.value),
+        validAfter: BigInt(authorization.validAfter),
+        validBefore: BigInt(authorization.validBefore),
+        nonce: authorization.nonce as `0x${string}`,
+      },
+      signature: structuredSignature,
+    });
+  } catch (error) {
+    console.error("[settlement] signature verification failed", error);
+    return false;
+  }
 }
