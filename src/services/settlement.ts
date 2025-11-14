@@ -2,8 +2,8 @@ import {
   http,
   createWalletClient,
   createPublicClient,
-  verifyTypedData,
   parseSignature,
+  recoverTypedDataAddress,
 } from "viem";
 import { privateKeyToAccount } from "viem/accounts";
 import { base, baseSepolia } from "viem/chains";
@@ -139,6 +139,12 @@ type AuthorizationLike = {
   nonce: string;
 };
 
+export interface SignatureVerificationResult {
+  ok: boolean;
+  recovered?: `0x${string}`;
+  error?: string;
+}
+
 export async function verifyAuthorizationSignature(params: {
   authorization: AuthorizationLike;
   signature: string;
@@ -146,7 +152,7 @@ export async function verifyAuthorizationSignature(params: {
   usdcContract: `0x${string}`;
   tokenName: string;
   tokenVersion: string;
-}): Promise<boolean> {
+}): Promise<SignatureVerificationResult> {
   const {
     authorization,
     signature,
@@ -158,28 +164,50 @@ export async function verifyAuthorizationSignature(params: {
 
   try {
     const structuredSignature = parseSignature(signature as `0x${string}`);
-    return await verifyTypedData({
-      address: authorization.from as `0x${string}`,
-      domain: {
-        name: tokenName,
-        version: tokenVersion,
-        chainId,
-        verifyingContract: usdcContract,
-      },
+
+    const domain = {
+      name: tokenName,
+      version: tokenVersion,
+      chainId,
+      verifyingContract: usdcContract,
+    } as const;
+
+    const message = {
+      from: authorization.from as `0x${string}`,
+      to: authorization.to as `0x${string}`,
+      value: BigInt(authorization.value),
+      validAfter: BigInt(authorization.validAfter),
+      validBefore: BigInt(authorization.validBefore),
+      nonce: authorization.nonce as `0x${string}`,
+    } as const;
+
+    const recovered = await recoverTypedDataAddress({
+      domain,
       types: TRANSFER_WITH_AUTH_TYPES,
       primaryType: "TransferWithAuthorization",
-      message: {
-        from: authorization.from as `0x${string}`,
-        to: authorization.to as `0x${string}`,
-        value: BigInt(authorization.value),
-        validAfter: BigInt(authorization.validAfter),
-        validBefore: BigInt(authorization.validBefore),
-        nonce: authorization.nonce as `0x${string}`,
-      },
+      message,
       signature: structuredSignature,
     });
+
+    const recoveredMatches =
+      recovered.toLowerCase() === (authorization.from as string).toLowerCase();
+
+    if (!recoveredMatches) {
+      console.warn("[settlement] recovered address mismatch", {
+        expectedFrom: authorization.from,
+        recovered,
+      });
+    }
+
+    return {
+      ok: recoveredMatches,
+      recovered,
+    };
   } catch (error) {
     console.error("[settlement] signature verification failed", error);
-    return false;
+    return {
+      ok: false,
+      error: error instanceof Error ? error.message : String(error),
+    };
   }
 }

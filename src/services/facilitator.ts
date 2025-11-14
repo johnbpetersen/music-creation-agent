@@ -216,6 +216,12 @@ export async function verifyAuthorizationWithFacilitator(
     return failure;
   }
 
+  console.info("[facilitator] verification ok", {
+    amountAtomic: amountPaid,
+    expectedPayTo: expected.payTo,
+    chain: expected.chain,
+  });
+
   return {
     ok: true,
     amountPaidAtomic: amountPaid,

@@ -231,7 +231,7 @@ describe("music endpoint paywall", () => {
             : "";
         return url.endsWith("/verify");
       }).length;
-      expect(verifyHits).toBe(1);
+      expect(verifyHits).toBe(0);
     } finally {
       global.fetch = originalFetch;
     }

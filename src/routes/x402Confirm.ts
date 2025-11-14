@@ -50,6 +50,8 @@ function respondError(
 
 export function registerX402ConfirmRoute(app: Hono) {
   app.post("/api/x402/confirm", async (c) => {
+    const confirmId = crypto.randomUUID();
+
     let parsed;
     try {
       const body = await c.req.json();
@@ -156,6 +158,16 @@ export function registerX402ConfirmRoute(app: Hono) {
     const requestUrl = new URL(c.req.url);
     const resourceUrl = `${requestUrl.origin}${MUSIC_PATH}`;
 
+    console.info("[x402-confirm] decoded payment header", {
+      confirmId,
+      payer: authorization.from,
+      payTo: authorization.to,
+      amount: normalizedValue,
+      nonce: authorization.nonce,
+      validAfter: authorization.validAfter,
+      validBefore: authorization.validBefore,
+    });
+
     const paymentRequirements = PaymentRequirementsSchema.parse({
       scheme: "exact",
       network: chainConfig.network,
@@ -170,6 +182,42 @@ export function registerX402ConfirmRoute(app: Hono) {
       maxTimeoutSeconds: MUSIC_DEFAULT_TIMEOUT_SECONDS,
       asset: chainConfig.usdcAddress,
       extra: { name: "USDC", version: "2" },
+    });
+
+    const signatureResult = await verifyAuthorizationSignature({
+      authorization,
+      signature,
+      chainId: chainConfig.chainId,
+      usdcContract: chainConfig.usdcAddress as `0x${string}`,
+      tokenName:
+        typeof paymentRequirements.extra?.name === "string"
+          ? paymentRequirements.extra.name
+          : "USD Coin",
+      tokenVersion:
+        typeof paymentRequirements.extra?.version === "string"
+          ? paymentRequirements.extra.version
+          : "2",
+    });
+
+    if (!signatureResult.ok) {
+      console.warn("[x402-confirm] signature verification failed", {
+        confirmId,
+        expectedFrom: authorization.from,
+        recovered: signatureResult.recovered,
+        error: signatureResult.error,
+      });
+      return respondError(
+        c,
+        400,
+        "INVALID_SIGNATURE",
+        "Authorization signature failed verification.",
+        signatureResult.error ?? undefined
+      );
+    }
+
+    console.info("[x402-confirm] signature verified", {
+      confirmId,
+      recovered: signatureResult.recovered,
     });
 
     const verification = await verifyAuthorizationWithFacilitator({
@@ -208,6 +256,13 @@ export function registerX402ConfirmRoute(app: Hono) {
         verification.detail
       );
     }
+
+    console.info("[x402-confirm] facilitator verified payment", {
+      confirmId,
+      payer: authorization.from,
+      payTo: payToAddress,
+      amountAtomic: verification.amountPaidAtomic,
+    });
 
     const isTestEnv = isTestEnvironment();
     const settlementRequested = env.SETTLE_TRANSACTIONS === "true";
@@ -258,6 +313,12 @@ export function registerX402ConfirmRoute(app: Hono) {
         );
       } else {
         try {
+          console.info("[x402-confirm] attempting settlement", {
+            confirmId,
+            payer: authorization.from,
+            nonce: authorization.nonce,
+            amount: normalizedValue,
+          });
           settlementTxHash = await settleAuthorization({
             authorization: {
               ...authorization,
@@ -270,6 +331,7 @@ export function registerX402ConfirmRoute(app: Hono) {
           });
           console.info("[x402-confirm] Settlement broadcast", {
             txHash: settlementTxHash,
+            confirmId,
           });
         } catch (error) {
           console.error("[x402-confirm] Settlement failed", error);
